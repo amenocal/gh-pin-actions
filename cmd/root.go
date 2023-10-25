@@ -4,6 +4,7 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -28,6 +29,7 @@ to quickly create a Cobra application.`,
 		Run: ActionsPin,
 	}
 	repository string
+	tag        string
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -50,23 +52,33 @@ func init() {
 	// when this action is called directly.
 	rootCmd.Flags().StringVarP(&repository, "repository", "r", "", "repository in the owner/repo format")
 	rootCmd.MarkFlagRequired("repository")
+
+	rootCmd.Flags().StringVarP(&tag, "tag", "t", "latest", "tag to pin to")
+	rootCmd.MarkFlagRequired("repository")
 }
 
 func ActionsPin(cmd *cobra.Command, args []string) {
-	latestRelease, std_err, err := gh.Exec("release", "view", "-R", repository, "--json", "tagName", "--jq", ".tagName")
+	var tagVersion bytes.Buffer
+	var std_err bytes.Buffer
+	var err error
+	if tag == "latest" || tag == "" {
+		tagVersion, std_err, err = gh.Exec("release", "view", "-R", repository, "--json", "tagName", "--jq", ".tagName")
+	} else {
+		tagVersion, std_err, err = gh.Exec("release", "view", tag, "-R", repository, "--json", "tagName", "--jq", ".tagName")
+	}
 	if err != nil {
 
 		fmt.Println("error", std_err.String())
 		return
 	}
-	cliArgs := fmt.Sprintf(".[] | select(.name == \"%s\") | .commit.sha", strings.TrimSpace(latestRelease.String()))
+	cliArgs := fmt.Sprintf(".[] | select(.name == \"%s\") | .commit.sha", strings.TrimSpace(tagVersion.String()))
 	cliOptions := fmt.Sprintf("repos/%s/tags", repository)
 	shaCommit, std_err, err := gh.Exec("api", cliOptions, "--jq", cliArgs)
 	if err != nil {
 		fmt.Println("error", std_err.String())
 		return
 	}
-	pinnableAction := fmt.Sprintf("%s@%s #%s", repository, strings.TrimSpace(shaCommit.String()), strings.TrimSpace(latestRelease.String()))
+	pinnableAction := fmt.Sprintf("%s@%s #%s", repository, strings.TrimSpace(shaCommit.String()), strings.TrimSpace(tagVersion.String()))
 	fmt.Println(pinnableAction)
 	// fmt.Println(string(shaCommit.String()))
 
