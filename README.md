@@ -38,7 +38,7 @@ Flags:
 Use "gh [command] --help" for more information about a command.
 ```
 
-Example: 
+Example:
 
 ```sh
 gh pin-actions -r actions/checkout -v 3
@@ -66,6 +66,9 @@ Example:
 ```sh
 gh pin-actions workflows
 ```
+
+>**Note**
+>Currently `gh pin-actions` will create a new file within your `.github/workflows` directory with the suffix `-pin`. This is to ensure that you can review the changes before committing them to your repository. Once you have reviewed the changes, you can delete the original workflow file and rename the `-pin` file to the original workflow file name.
 
 ## Contributing
 
