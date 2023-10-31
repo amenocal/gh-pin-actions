@@ -6,7 +6,7 @@
 
 To install `gh-pin-actions`, run the following command:
 
-`gh extension install amencoal/gh-pin-actions`
+`gh extension install amenocal/gh-pin-actions`
 
 ## Usage
 
@@ -38,6 +38,8 @@ Flags:
 Use "gh [command] --help" for more information about a command.
 ```
 
+Example: 
+
 ```sh
 gh pin-actions -r actions/checkout -v 3
 ```
@@ -59,17 +61,11 @@ Global Flags:
   -d, --debug   debug mode - set logger to debug level
 ```
 
+Example:
+
 ```sh
 gh pin-actions workflows
 ```
-
-### Debug Mode
-
-You can enable debug mode by providing the `-d` or `--debug` option:
-
-gh workflows --debug
-
-In debug mode, `gh-pin-actions` will output detailed debug logs.
 
 ## Contributing
 
