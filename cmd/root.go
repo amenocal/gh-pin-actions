@@ -51,10 +51,14 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().StringVarP(&repository, "repository", "r", "", "repository in the owner/repo format")
-	rootCmd.MarkFlagRequired("repository")
+	if err := rootCmd.MarkFlagRequired("repository"); err != nil {
+		logger.Fatal("error marking repository flag as required", logger.Args("error:", err))
+	}
 
 	rootCmd.Flags().StringVarP(&version, "version", "v", "latest", "version of the tag to pin to (ex. 3; 3.1; 3.1.1)")
-	rootCmd.MarkFlagRequired("repository")
+	if err := rootCmd.MarkFlagRequired("version"); err != nil {
+		logger.Fatal("error marking version flag as required", logger.Args("error:", err))
+	}
 
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "debug mode - set logger to debug level")
 }
