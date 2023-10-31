@@ -109,7 +109,7 @@ func processActionsYaml(workflow string) {
 			if step.Uses != "" {
 				actionWithVersion := step.Uses
 				if !strings.Contains(actionWithVersion, "@v") {
-					logger.Info("actions is not in `@v` version format", logger.Args("action:", actionWithVersion))
+					logger.Warn("actions is not in `@v` version format... Skipping", logger.Args("action:", actionWithVersion))
 					continue
 				}
 				actionSplit := strings.Split(actionWithVersion, "@v")
@@ -117,10 +117,12 @@ func processActionsYaml(workflow string) {
 					actionVersion := actionSplit[1]
 					actionVersion = pkg.ProcessActionsVersion(actionVersion)
 					commitSha, tagVersion, err := GetActionHashByVersion(actionSplit[0], actionVersion)
+					actionWithSha := fmt.Sprintf("%s@%s #%s", actionSplit[0], commitSha, tagVersion)
 					if err != nil {
 						logger.Error("Error getting commit sha for action", logger.Args("action:", actionWithVersion, "error:", err))
+						logger.Warn("Nothing will be updated")
+						actionWithSha = actionWithVersion
 					}
-					actionWithSha := fmt.Sprintf("%s@%s #%s", actionSplit[0], commitSha, tagVersion)
 					logger.Info("Replacing action with sha", logger.Args("action:", actionWithVersion, "sha:", actionWithSha))
 					writeModifiedWorkflowToFile(pinnedWorkflow, actionWithVersion, actionWithSha)
 				}
