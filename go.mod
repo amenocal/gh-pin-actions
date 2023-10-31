@@ -1,6 +1,6 @@
 module github.com/amenocal/gh-pin-actions
 
-go 1.21.1
+go 1.21
 
 require (
 	github.com/cli/go-gh/v2 v2.4.0
