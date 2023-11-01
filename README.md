@@ -2,6 +2,8 @@
 
 `gh-pin-actions` is a GitHub CLI extension that allows you to pin GitHub Actions based on their version.
 
+Currently supported formats: `<repo>/<action>@<version>`
+
 ## Installation
 
 To install `gh-pin-actions`, run the following command:
