@@ -19,3 +19,6 @@
 
 # Go workspace file
 go.work
+
+/gh-pin-actions
+/gh-pin-actions.exe
