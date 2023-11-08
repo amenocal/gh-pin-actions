@@ -102,6 +102,10 @@ func GetActionHashByVersion(repository string, version string) (string, string, 
 	if err != nil {
 		return "", tagVersion, err
 	}
+	if shaCommit.String() == "" {
+		logger.Error("Version tag does not exist, no hash found", logger.Args("version", tagVersion))
+		return "", tagVersion, err
+	}
 	sha := strings.TrimSpace(shaCommit.String())
 	return sha, tagVersion, nil
 }
@@ -121,7 +125,7 @@ func GetLatestPatchVersion(repository string, version string) (string, error) {
 	tagsString := tagsBuffer.String()
 	tags := strings.Split(tagsString, "\n")
 
-	var latest pkg.Semver
+	var semverVersion pkg.Semver
 	for _, tag := range tags {
 
 		tagVersion, err := pkg.ParseSemver(tag)
@@ -130,17 +134,18 @@ func GetLatestPatchVersion(repository string, version string) (string, error) {
 		}
 
 		if strings.Contains(version, ".") {
-			if fmt.Sprintf("%d.%d", tagVersion.Major, tagVersion.Minor) == version && tagVersion.Patch > latest.Patch {
-				latest = tagVersion
+			requestedMajorMinor := fmt.Sprintf("%d.%d", tagVersion.Major, tagVersion.Minor)
+			if requestedMajorMinor == version && tagVersion.Patch >= semverVersion.Patch {
+				semverVersion = tagVersion
 			}
 		} else {
-			if fmt.Sprintf("%d", tagVersion.Major) == version && (tagVersion.Minor > latest.Minor || (tagVersion.Minor == latest.Minor && tagVersion.Patch > latest.Patch)) {
-				latest = tagVersion
+			if fmt.Sprintf("%d", tagVersion.Major) == version && tagVersion.Minor >= semverVersion.Minor {
+				semverVersion = tagVersion
 			}
 		}
 	}
 	//fmt.Printf("Latest patch version for %s: %d.%d.%d\n", version, latest.Major, latest.Minor, latest.Patch)
-	newVersion := fmt.Sprintf("v%d.%d.%d", latest.Major, latest.Minor, latest.Patch)
+	newVersion := fmt.Sprintf("v%d.%d.%d", semverVersion.Major, semverVersion.Minor, semverVersion.Patch)
 	return newVersion, nil
 
 }
