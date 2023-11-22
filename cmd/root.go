@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/amenocal/gh-pin-actions/pkg"
@@ -31,6 +32,7 @@ var (
 	repository string
 	version    string
 	debug      bool
+	branchName string
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -57,20 +59,37 @@ func init() {
 	}
 
 	rootCmd.Flags().StringVarP(&version, "version", "v", "latest", "version of the tag to pin to (ex. 3; 3.1; 3.1.1)")
-	if err := rootCmd.MarkFlagRequired("version"); err != nil {
-		logger.Fatal("error marking version flag as required", logger.Args("error:", err))
-	}
+
+	rootCmd.Flags().StringVarP(&branchName, "branch", "b", "", "branch name to pin to")
 
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "debug mode - set logger to debug level")
 }
 
 func ActionsPin(cmd *cobra.Command, args []string) {
+	var shaCommit string
+	var tagVersion string
+	var err error
 	if debug {
 		logger = pterm.DefaultLogger.WithLevel(pterm.LogLevelDebug)
 	} else {
 		logger = pterm.DefaultLogger.WithLevel(pterm.LogLevelWarn)
 	}
-	shaCommit, tagVersion, err := GetActionHashByVersion(repository, version)
+
+	if branchName != "" {
+		fmt.Println("Branch name:", branchName)
+		tagVersion = branchName
+		shaCommit, err = GetBranchHash(repository, branchName)
+	} else {
+		isVersionFormat, _ := regexp.MatchString(`^v?\d+(\.\d+)?(\.\d+)?$`, version)
+		if version == "latest" || version == "" || isVersionFormat {
+			fmt.Println("Version:", version)
+			shaCommit, tagVersion, err = GetActionHashByVersion(repository, version)
+		} else {
+			logger.Fatal("version flag must be in the format v1, v1.1, or v1.1.1", logger.Args("version received", version),
+				logger.Args("recommendation", "use the --branch flag to pin to a branch"))
+		}
+	}
+
 	if err != nil {
 		logger.Error("Unable to get sha of Version", logger.Args("version:", version), logger.Args("error:", err))
 		os.Exit(0)
@@ -137,4 +156,15 @@ func GetLatestPatchVersion(repository string, version string) (string, error) {
 
 	return newVersion, nil
 
+}
+
+func GetBranchHash(repository string, branch string) (string, error) {
+	cliArgs := ".commit.sha"
+	cliOptions := fmt.Sprintf("repos/%s/branches/%s", repository, branch)
+	shaCommit, std_err, err := gh.Exec("api", cliOptions, "--jq", cliArgs)
+	if err != nil {
+		logger.Error("Issue with gh api and getting specific branch hash", logger.Args("error:", std_err.String(), "action", fmt.Sprintf("%s@%s", repository, branch)))
+		return "", err
+	}
+	return shaCommit.String(), nil
 }
