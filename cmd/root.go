@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -72,6 +73,7 @@ func ActionsPin(cmd *cobra.Command, args []string) {
 	shaCommit, tagVersion, err := GetActionHashByVersion(repository, version)
 	if err != nil {
 		logger.Error("Unable to get sha of Version", logger.Args("version:", version), logger.Args("error:", err))
+		os.Exit(0)
 	}
 	pinnableAction := fmt.Sprintf("%s@%s #%s", repository, strings.TrimSpace(shaCommit), strings.TrimSpace(tagVersion))
 	fmt.Println(pinnableAction)
@@ -84,6 +86,8 @@ func GetActionHashByVersion(repository string, version string) (string, string, 
 	var std_err bytes.Buffer
 	var err error
 
+	// Remove 'v' from the version string if sent through command line
+	version = strings.TrimPrefix(version, "v")
 	// Check to see if value received is latest version or a specific version
 	if version == "latest" || version == "" {
 		tagVersionBuffer, std_err, err = gh.Exec("release", "view", "-R", repository, "--json", "tagName", "--jq", ".tagName")
@@ -103,8 +107,8 @@ func GetActionHashByVersion(repository string, version string) (string, string, 
 		return "", tagVersion, err
 	}
 	if shaCommit.String() == "" {
-		logger.Error("Version tag does not exist, no hash found", logger.Args("version", tagVersion))
-		return "", tagVersion, err
+		//logger.Error("Version tag does not exist, no hash found", logger.Args("version", tagVersion))
+		return "", tagVersion, errors.New("version tag does not exist")
 	}
 	sha := strings.TrimSpace(shaCommit.String())
 	return sha, tagVersion, nil
@@ -125,27 +129,12 @@ func GetLatestPatchVersion(repository string, version string) (string, error) {
 	tagsString := tagsBuffer.String()
 	tags := strings.Split(tagsString, "\n")
 
-	var semverVersion pkg.Semver
-	for _, tag := range tags {
-
-		tagVersion, err := pkg.ParseSemver(tag)
-		if err != nil {
-			continue
-		}
-
-		if strings.Contains(version, ".") {
-			requestedMajorMinor := fmt.Sprintf("%d.%d", tagVersion.Major, tagVersion.Minor)
-			if requestedMajorMinor == version && tagVersion.Patch >= semverVersion.Patch {
-				semverVersion = tagVersion
-			}
-		} else {
-			if fmt.Sprintf("%d", tagVersion.Major) == version && tagVersion.Minor >= semverVersion.Minor {
-				semverVersion = tagVersion
-			}
-		}
+	newVersion, err := pkg.FindHighestPatchVersion(tags, version)
+	if err != nil {
+		logger.Error("Unable to find highest patch version", logger.Args("error:", err))
+		return "", err
 	}
-	//fmt.Printf("Latest patch version for %s: %d.%d.%d\n", version, latest.Major, latest.Minor, latest.Patch)
-	newVersion := fmt.Sprintf("v%d.%d.%d", semverVersion.Major, semverVersion.Minor, semverVersion.Patch)
+
 	return newVersion, nil
 
 }

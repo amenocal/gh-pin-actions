@@ -37,6 +37,29 @@ func ParseSemver(version string) (Semver, error) {
 	return Semver{Major: major, Minor: minor, Patch: patch}, nil
 }
 
+func FindHighestPatchVersion(tags []string, version string) (string, error) {
+	var semverVersion Semver
+	for _, tag := range tags {
+
+		tagVersion, err := ParseSemver(tag)
+		if err != nil {
+			continue
+		}
+
+		if strings.Contains(version, ".") {
+			requestedMajorMinor := fmt.Sprintf("%d.%d", tagVersion.Major, tagVersion.Minor)
+			if requestedMajorMinor == version && tagVersion.Patch >= semverVersion.Patch {
+				semverVersion = tagVersion
+			}
+		} else {
+			if fmt.Sprintf("%d", tagVersion.Major) == version && tagVersion.Minor >= semverVersion.Minor {
+				semverVersion = tagVersion
+			}
+		}
+	}
+	return fmt.Sprintf("v%d.%d.%d", semverVersion.Major, semverVersion.Minor, semverVersion.Patch), nil
+}
+
 func ProcessActionsVersion(version string) string {
 	if strings.HasPrefix(version, "v") && !strings.Contains(version, ".") {
 		version = version + ".0."
