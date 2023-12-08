@@ -10,7 +10,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
-            "args": ["-r", "actions/checkout" , "-v", "main"]
+            "args": ["-r", "actions/checkout" , "-v", "main", "--debug"]
         },
         {
             "name": "Debug sending Major.Minor",
@@ -18,7 +18,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
-            "args": ["-r", "actions/checkout" , "-v", "3.5"]
+            "args": ["-r", "actions/checkout" , "-v", "3.5", "--debug"]
         },
         {
             "name": "Debug sending Major",
@@ -26,7 +26,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
-            "args": ["-r", "actions/checkout" , "-v", "3"]
+            "args": ["-r", "actions/checkout" , "-v", "3", "--debug"]
         },
         {
             "name": "Debug sending Major.Minor.Patch ",
@@ -34,7 +34,15 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
-            "args": ["-r", "actions/checkout" , "-v", "3.5.3"]
+            "args": ["-r", "actions/checkout" , "-v", "3.5.3", "--debug"]
+        },
+        {
+            "name": "Debug sending Major.Minor.Patch ",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}",
+            "args": ["workflows", "--debug"]
         }
     ]
 }
