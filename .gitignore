@@ -22,3 +22,6 @@ go.work
 
 /gh-pin-actions
 /gh-pin-actions.exe
+
+# pinned workflows
+*-pin.yml

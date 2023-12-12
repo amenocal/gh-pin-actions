@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/pterm/pterm"
@@ -91,6 +92,7 @@ func getWorkflowFiles() ([]string, error) {
 func processActionsYaml(workflow string) {
 	var wf Workflow
 	data, err := os.ReadFile(workflow)
+	logger.Print("Processing workflow", logger.Args("file:", workflow))
 	if err != nil {
 		logger.Warn("Error reading YAML", logger.Args("file:", workflow, "error:", err))
 
@@ -103,28 +105,46 @@ func processActionsYaml(workflow string) {
 	if err != nil {
 		logger.Warn("Error creating temp file", logger.Args("file:", workflow, "error:", err))
 	}
+
+	// Compile the regular expression before the loop
+	regHash, err := regexp.Compile(`@[0-9a-f]{40}`)
+	if err != nil {
+		logger.Warn("Error compiling Hash regex", logger.Args("error:", err))
+	}
+	branchRegex, err := regexp.Compile(`^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+$`)
+	if err != nil {
+		logger.Warn("Error compiling branch regex", logger.Args("error:", err))
+	}
+
+	// Loop through all the jobs and steps
 	for _, job := range wf.Jobs {
 		for i, step := range job.Steps {
-			logger.Info("Processing Step", logger.Args("step:", fmt.Sprintf("%d %s", i+1, step.Name)))
-			if step.Uses != "" {
-				actionWithVersion := step.Uses
-				if !strings.Contains(actionWithVersion, "@v") {
-					logger.Warn("actions is not in `@v` version format... Skipping", logger.Args("action:", actionWithVersion))
+			logger.Trace("Processing Step", logger.Args("step:", fmt.Sprintf("%d %s", i+1, step.Name)))
+			if action := step.Uses; action != "" {
+				if matched := regHash.MatchString(action); matched {
+					// Action already has a hash
+					logger.Info("Action already has a hash", logger.Args("action:", action))
 					continue
-				}
-				actionSplit := strings.Split(actionWithVersion, "@v")
-				if len(actionSplit) > 1 {
-					actionVersion := actionSplit[1]
-					actionVersion = pkg.ProcessActionsVersion(actionVersion)
-					commitSha, tagVersion, err := GetActionHashByVersion(actionSplit[0], actionVersion)
-					actionWithSha := fmt.Sprintf("%s@%s #%s", actionSplit[0], commitSha, tagVersion)
+				} else if strings.Contains(action, "@v") {
+					// Action has a version
+					actionWithVersion := action
+					actionWithSha, err := processActionWithVersion(actionWithVersion)
 					if err != nil {
 						logger.Error("Error getting commit sha for action", logger.Args("action:", actionWithVersion, "error:", err))
 						logger.Warn("Nothing will be updated")
 						actionWithSha = actionWithVersion
 					}
-					logger.Info("Replacing action with sha", logger.Args("action:", actionWithVersion, "sha:", actionWithSha))
 					writeModifiedWorkflowToFile(pinnedWorkflow, actionWithVersion, actionWithSha)
+				} else if branchRegex.MatchString(action) {
+					// Action has a branch
+					actionWithBranch := action
+					actionWithSha, err := processActionWithBranch(actionWithBranch)
+					if err != nil {
+						logger.Error("Error getting commit sha for action with Branch", logger.Args("action:", actionWithBranch, "error:", err))
+						logger.Warn("Nothing will be updated")
+						actionWithSha = actionWithBranch
+					}
+					writeModifiedWorkflowToFile(pinnedWorkflow, actionWithBranch, actionWithSha)
 				}
 			}
 		}
@@ -135,17 +155,18 @@ func processActionsYaml(workflow string) {
 
 }
 
-func writeModifiedWorkflowToFile(fileName string, actionWithVersion string, actionWithSha string) {
+func writeModifiedWorkflowToFile(fileName string, action string, actionWithSha string) {
 
 	newFileContent, err := os.ReadFile(fileName)
 	if err != nil {
 		logger.Warn("Error reading file", logger.Args("file:", fileName, "error:", err))
 	}
-	modifiedContent := strings.Replace(string(newFileContent), actionWithVersion, actionWithSha, 1)
+	modifiedContent := strings.Replace(string(newFileContent), action, actionWithSha, 1)
 	err = os.WriteFile(fileName, []byte(modifiedContent), 0644)
 	if err != nil {
 		logger.Warn("Error creating file", logger.Args("file:", fileName, "error:", err))
 	}
+	logger.Info("Replacing action with sha", logger.Args("action:", action, "sha:", actionWithSha))
 }
 
 func createTempYAMLFile(fileName string) (string, error) {
@@ -163,4 +184,34 @@ func createTempYAMLFile(fileName string) (string, error) {
 		return "", err
 	}
 	return newFileName, nil
+}
+
+func processActionWithVersion(actionWithVersion string) (string, error) {
+	actionSplit := strings.Split(actionWithVersion, "@v")
+	if len(actionSplit) < 2 {
+		return "", fmt.Errorf("invalid action format: %s", actionWithVersion)
+	}
+	repoWithOwner := actionSplit[0]
+	versionParsed := actionSplit[1]
+	actionVersion := pkg.FormatVersion(versionParsed)
+	commitSha, tagVersion, err := GetActionHashByVersion(repoWithOwner, actionVersion)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s@%s #%s", repoWithOwner, strings.TrimSpace(commitSha), strings.TrimSpace(tagVersion)), nil
+
+}
+
+func processActionWithBranch(actionWithBranch string) (string, error) {
+	actionSplit := strings.Split(actionWithBranch, "@")
+	if len(actionSplit) < 2 {
+		return "", fmt.Errorf("invalid action format: %s", actionWithBranch)
+	}
+	repoWithOwner := actionSplit[0]
+	branchName := actionSplit[1]
+	commitSha, err := GetBranchHash(repoWithOwner, branchName)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s@%s #%s", repoWithOwner, strings.TrimSpace(commitSha), strings.TrimSpace(branchName)), nil
 }

@@ -60,7 +60,7 @@ func FindHighestPatchVersion(tags []string, version string) (string, error) {
 	return fmt.Sprintf("v%d.%d.%d", semverVersion.Major, semverVersion.Minor, semverVersion.Patch), nil
 }
 
-func ProcessActionsVersion(version string) string {
+func FormatVersion(version string) string {
 	if strings.HasPrefix(version, "v") && !strings.Contains(version, ".") {
 		version = version + ".0."
 	}
