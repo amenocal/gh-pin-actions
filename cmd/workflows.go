@@ -209,7 +209,6 @@ func processAction(action string) (string, error) {
 		actionWithSha, err = processActionWithVersion(actionWithVersion)
 		if err != nil {
 			logger.Error("Error getting commit sha for action", logger.Args("action:", actionWithVersion, "error:", err))
-			//logger.Warn("Nothing will be updated")
 			actionWithSha = actionWithVersion
 			return actionWithSha, err
 		}
@@ -220,7 +219,6 @@ func processAction(action string) (string, error) {
 		actionWithSha, err = processActionWithBranch(actionWithBranch)
 		if err != nil {
 			logger.Error("Error getting commit sha for action with Branch", logger.Args("action:", actionWithBranch, "error:", err))
-			logger.Warn("Nothing will be updated")
 			actionWithSha = actionWithBranch
 			return actionWithSha, err
 		}
