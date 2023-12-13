@@ -172,12 +172,10 @@ func createTempYAMLFile(fileName string) (string, error) {
 }
 
 func processActionWithVersion(actionWithVersion string) (string, error) {
-	actionSplit := strings.Split(actionWithVersion, "@v")
-	if len(actionSplit) < 2 {
-		return "", fmt.Errorf("invalid action format: %s", actionWithVersion)
+	repoWithOwner, versionParsed, err := pkg.SplitActionString(actionWithVersion, "@v")
+	if err != nil {
+		return "", err
 	}
-	repoWithOwner := actionSplit[0]
-	versionParsed := actionSplit[1]
 	actionVersion := pkg.FormatVersion(versionParsed)
 	commitSha, tagVersion, err := GetActionHashByVersion(repoWithOwner, actionVersion)
 	if err != nil {
@@ -188,12 +186,10 @@ func processActionWithVersion(actionWithVersion string) (string, error) {
 }
 
 func processActionWithBranch(actionWithBranch string) (string, error) {
-	actionSplit := strings.Split(actionWithBranch, "@")
-	if len(actionSplit) < 2 {
-		return "", fmt.Errorf("invalid action format: %s", actionWithBranch)
+	repoWithOwner, branchName, err := pkg.SplitActionString(actionWithBranch, "@")
+	if err != nil {
+		return "", err
 	}
-	repoWithOwner := actionSplit[0]
-	branchName := actionSplit[1]
 	commitSha, err := GetBranchHash(repoWithOwner, branchName)
 	if err != nil {
 		return "", err
