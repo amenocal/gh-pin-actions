@@ -111,10 +111,6 @@ func processActionsYaml(workflow string) {
 	if err != nil {
 		logger.Warn("Error compiling Hash regex", logger.Args("error:", err))
 	}
-	branchRegex, err := regexp.Compile(`^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+$`)
-	if err != nil {
-		logger.Warn("Error compiling branch regex", logger.Args("error:", err))
-	}
 
 	// Loop through all the jobs and steps
 	for _, job := range wf.Jobs {
@@ -125,26 +121,13 @@ func processActionsYaml(workflow string) {
 					// Action already has a hash
 					logger.Info("Action already has a hash", logger.Args("action:", action))
 					continue
-				} else if strings.Contains(action, "@v") {
-					// Action has a version
-					actionWithVersion := action
-					actionWithSha, err := processActionWithVersion(actionWithVersion)
+				} else {
+					// Actions doesn't have a hash
+					actionWithSha, err := processAction(action)
 					if err != nil {
-						logger.Error("Error getting commit sha for action", logger.Args("action:", actionWithVersion, "error:", err))
 						logger.Warn("Nothing will be updated")
-						actionWithSha = actionWithVersion
 					}
-					writeModifiedWorkflowToFile(pinnedWorkflow, actionWithVersion, actionWithSha)
-				} else if branchRegex.MatchString(action) {
-					// Action has a branch
-					actionWithBranch := action
-					actionWithSha, err := processActionWithBranch(actionWithBranch)
-					if err != nil {
-						logger.Error("Error getting commit sha for action with Branch", logger.Args("action:", actionWithBranch, "error:", err))
-						logger.Warn("Nothing will be updated")
-						actionWithSha = actionWithBranch
-					}
-					writeModifiedWorkflowToFile(pinnedWorkflow, actionWithBranch, actionWithSha)
+					writeModifiedWorkflowToFile(pinnedWorkflow, action, actionWithSha)
 				}
 			}
 		}
@@ -156,7 +139,9 @@ func processActionsYaml(workflow string) {
 }
 
 func writeModifiedWorkflowToFile(fileName string, action string, actionWithSha string) {
-
+	if action == "" || actionWithSha == "" {
+		logger.Error("action or actionWithSha are empty", logger.Args("action:", action, "actionWithSha:", actionWithSha))
+	}
 	newFileContent, err := os.ReadFile(fileName)
 	if err != nil {
 		logger.Warn("Error reading file", logger.Args("file:", fileName, "error:", err))
@@ -214,4 +199,35 @@ func processActionWithBranch(actionWithBranch string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%s@%s #%s", repoWithOwner, strings.TrimSpace(commitSha), strings.TrimSpace(branchName)), nil
+}
+
+func processAction(action string) (string, error) {
+	var actionWithSha string
+	branchRegex, err := regexp.Compile(`^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+$`)
+	if err != nil {
+		logger.Warn("Error compiling branch regex", logger.Args("error:", err))
+	}
+	if strings.Contains(action, "@v") {
+		// Action has a version
+		actionWithVersion := action
+		actionWithSha, err = processActionWithVersion(actionWithVersion)
+		if err != nil {
+			logger.Error("Error getting commit sha for action", logger.Args("action:", actionWithVersion, "error:", err))
+			//logger.Warn("Nothing will be updated")
+			actionWithSha = actionWithVersion
+			return actionWithSha, err
+		}
+
+	} else if branchRegex.MatchString(action) {
+		// Action has a branch
+		actionWithBranch := action
+		actionWithSha, err = processActionWithBranch(actionWithBranch)
+		if err != nil {
+			logger.Error("Error getting commit sha for action with Branch", logger.Args("action:", actionWithBranch, "error:", err))
+			logger.Warn("Nothing will be updated")
+			actionWithSha = actionWithBranch
+			return actionWithSha, err
+		}
+	}
+	return actionWithSha, nil
 }
