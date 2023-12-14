@@ -104,7 +104,7 @@ func GetActionHashByVersion(repository string, version string) (string, string, 
 	var tagVersion string
 	var std_err bytes.Buffer
 	var err error
-
+	repository = pkg.ExtractOwnerRepo(repository)
 	// Remove 'v' from the version string if sent through command line
 	version = strings.TrimPrefix(version, "v")
 	// Check to see if value received is latest version or a specific version
@@ -159,6 +159,7 @@ func GetLatestPatchVersion(repository string, version string) (string, error) {
 }
 
 func GetBranchHash(repository string, branch string) (string, error) {
+	repository = pkg.ExtractOwnerRepo(repository)
 	cliArgs := ".commit.sha"
 	cliOptions := fmt.Sprintf("repos/%s/branches/%s", repository, branch)
 	shaCommit, std_err, err := gh.Exec("api", cliOptions, "--jq", cliArgs)

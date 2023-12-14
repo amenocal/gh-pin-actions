@@ -31,7 +31,7 @@ func TestParseSemver(t *testing.T) {
 }
 
 func TestFindHighestPatchVersion(t *testing.T) {
-	tags := []string{"v1.2.3", "v2.0.0", "v1.0.0-alpha", "v1.2", "v1.3.1", "v3.5.0", "v3.4.0"}
+	tags := []string{"v1.2.3", "v2.0.0", "v1.0.0-alpha", "v1.2", "v1.3.1", "v3.5.0", "v3.4.0", "v3.5.2", "v3.5.1"}
 
 	tests := []struct {
 		version  string
@@ -41,7 +41,7 @@ func TestFindHighestPatchVersion(t *testing.T) {
 		{"2", "v2.0.0"},
 		{"1.3", "v1.3.1"},
 		{"1", "v1.3.1"},
-		{"3", "v3.5.0"},
+		{"3", "v3.5.2"},
 	}
 
 	for _, test := range tests {

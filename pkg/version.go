@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -39,6 +40,17 @@ func ParseSemver(version string) (Semver, error) {
 
 func FindHighestPatchVersion(tags []string, version string) (string, error) {
 	var semverVersion Semver
+	// Remove the last element if it's an empty string
+	if tags[len(tags)-1] == "" {
+		tags = tags[:len(tags)-1]
+	}
+
+	//sort tags in descending order
+	sort.Strings(tags)
+	sort.Slice(tags, func(i, j int) bool {
+		return tags[i] > tags[j]
+	})
+
 	for _, tag := range tags {
 
 		tagVersion, err := ParseSemver(tag)
@@ -48,12 +60,14 @@ func FindHighestPatchVersion(tags []string, version string) (string, error) {
 
 		if strings.Contains(version, ".") {
 			requestedMajorMinor := fmt.Sprintf("%d.%d", tagVersion.Major, tagVersion.Minor)
-			if requestedMajorMinor == version && tagVersion.Patch >= semverVersion.Patch {
+			if requestedMajorMinor == version {
 				semverVersion = tagVersion
+				break
 			}
 		} else {
-			if fmt.Sprintf("%d", tagVersion.Major) == version && tagVersion.Minor >= semverVersion.Minor {
+			if fmt.Sprintf("%d", tagVersion.Major) == version {
 				semverVersion = tagVersion
+				break
 			}
 		}
 	}
