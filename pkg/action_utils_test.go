@@ -31,3 +31,22 @@ func TestSplitActionString(t *testing.T) {
 		}
 	}
 }
+func TestExtractOwnerRepo(t *testing.T) {
+	tests := []struct {
+		repository string
+		expected   string
+	}{
+		{"owner/repo", "owner/repo"},
+		{"owner/repo/sub", "owner/repo"},
+		{"owner/repo/sub/sub", "owner/repo"},
+		{"repo", "repo"},
+		{"", ""},
+	}
+
+	for _, test := range tests {
+		result := ExtractOwnerRepo(test.repository)
+		if result != test.expected {
+			t.Errorf("Unexpected result for repository %s: got %s, want %s", test.repository, result, test.expected)
+		}
+	}
+}

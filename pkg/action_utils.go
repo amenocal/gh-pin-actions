@@ -14,3 +14,13 @@ func SplitActionString(action string, delimiter string) (string, string, error) 
 	branchOrVersion := actionSplit[1]
 	return repoWithOwner, branchOrVersion, nil
 }
+
+func ExtractOwnerRepo(repository string) string {
+	if strings.Count(repository, "/") > 1 {
+		parts := strings.Split(repository, "/")
+		if len(parts) > 2 {
+			repository = parts[0] + "/" + parts[1]
+		}
+	}
+	return repository
+}

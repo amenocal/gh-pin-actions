@@ -6,6 +6,8 @@ Currently supported formats:
 
 - `<repo>/<action>@<version>`
 - `<repos>/<action>@<branchName>`
+- `<repo>/<action>/sub-action@<version>`
+- `<repo>/<action>/sub-action@<branchName>`
 
 ## Installation
 
