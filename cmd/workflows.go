@@ -23,7 +23,8 @@ var (
 		action with version in the workflow file and replaces it with the sha of the specific version`,
 		Run: processWorkflows,
 	}
-	logger *pterm.Logger
+	logger             *pterm.Logger
+	overwriteWorkflows bool
 )
 
 type Step struct {
@@ -44,7 +45,7 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	// rootCmd.Flags().StringVarP(&repository, "repository", "r", "", "repository in the owner/repo format")
+	workflowsCmd.Flags().BoolVarP(&overwriteWorkflows, "overwrite", "o", false, "overwrite existing workflow files")
 	// rootCmd.MarkFlagRequired("repository")
 
 	// rootCmd.Flags().StringVarP(&version, "version", "v", "latest", "version of the tag to pin to (ex. 3; 3.1; 3.1.1)")
@@ -131,6 +132,13 @@ func processActionsYaml(workflow string) {
 				}
 			}
 		}
+	}
+	if overwriteWorkflows {
+		err := os.Rename(pinnedWorkflow, workflow)
+		if err != nil {
+			logger.Warn("Error renaming file", logger.Args("file:", pinnedWorkflow, "error:", err))
+		}
+		pinnedWorkflow = workflow
 	}
 	if err == nil {
 		fmt.Println("Done! Please review the changes in the following file:", pinnedWorkflow)

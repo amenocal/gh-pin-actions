@@ -66,7 +66,8 @@ Usage:
   gh workflows [flags]
 
 Flags:
-  -h, --help   help for workflows
+  -h, --help        help for workflows
+  -o, --overwrite   overwrite existing workflow files
 
 Global Flags:
   -d, --debug   debug mode - set logger to debug level
@@ -79,7 +80,7 @@ gh pin-actions workflows
 ```
 
 >**Note**
->Currently `gh pin-actions` will create a new file within your `.github/workflows` directory with the suffix `-pin`. This is to ensure that you can review the changes before committing them to your repository. Once you have reviewed the changes, you can delete the original workflow file and rename the `-pin` file to the original workflow file name.
+>`gh pin-actions` will create a new file within your `.github/workflows` directory with the suffix `-pin`. This is to ensure that you can review the changes before committing them to your repository. Once you have reviewed the changes, you can then pass the `--overwrite` flag to overwrite your existing workflow files with the pin shas.
 
 ## Contributing
 
