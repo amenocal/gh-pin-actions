@@ -10,7 +10,10 @@ import (
 func TestGetWorkflowFiles(t *testing.T) {
 	// Setup: create a temporary directory with test files
 	tempDir := t.TempDir()
-	os.MkdirAll(filepath.Join(tempDir, ".github", "workflows"), 0755)
+	err := os.MkdirAll(filepath.Join(tempDir, ".github", "workflows"), 0755)
+	if err != nil {
+		t.Fatalf("Unexpected error creating directory: %v", err)
+	}
 	testFiles := []string{
 		"workflow1.yml",
 		"workflow2.yaml",
@@ -18,13 +21,24 @@ func TestGetWorkflowFiles(t *testing.T) {
 		"workflow-pin.yaml",
 	}
 	for _, file := range testFiles {
-		os.WriteFile(filepath.Join(tempDir, ".github", "workflows", file), []byte{}, 0644)
+		err := os.WriteFile(filepath.Join(tempDir, ".github", "workflows", file), []byte{}, 0644)
+		if err != nil {
+			t.Fatalf("Unexpected error writing file: %v", err)
+		}
 	}
 
 	// Override the directory for testing
 	originalDir, _ := os.Getwd()
-	defer func() { os.Chdir(originalDir) }()
-	os.Chdir(tempDir)
+	defer func() {
+		err := os.Chdir(originalDir)
+		if err != nil {
+			t.Fatalf("Unexpected error changing directory: %v", err)
+		}
+	}()
+	err = os.Chdir(tempDir)
+	if err != nil {
+		t.Fatalf("Unexpected error changing directory: %v", err)
+	}
 
 	workflowFiles, err := getWorkflowFiles()
 	if err != nil {
