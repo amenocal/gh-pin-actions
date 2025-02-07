@@ -230,6 +230,10 @@ func processAction(action string) (string, error) {
 			actionWithSha = actionWithBranch
 			return actionWithSha, err
 		}
+	} else if strings.Contains(action, "./") {
+		// Action is local
+		logger.Info("Action is local", logger.Args("action:", action))
+		return action, nil
 	}
 	return actionWithSha, nil
 }
