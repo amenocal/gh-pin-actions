@@ -1,26 +1,32 @@
 package pkg
 
 import (
-	"fmt"
 	"strings"
 )
 
-func SplitActionString(action string, delimiter string) (string, string, error) {
-	actionSplit := strings.Split(action, delimiter)
-	if len(actionSplit) < 2 {
-		return "", "", fmt.Errorf("invalid action format: %s", action)
+func splitOnLastAt(value string) (string, string, bool) {
+	lastAt := strings.LastIndex(value, "@")
+	if lastAt == -1 {
+		return value, "", false
 	}
-	repoWithOwner := actionSplit[0]
-	branchOrVersion := actionSplit[1]
-	return repoWithOwner, branchOrVersion, nil
+
+	return value[:lastAt], value[lastAt+1:], true
 }
 
-func ExtractOwnerRepo(repository string) string {
-	if strings.Count(repository, "/") > 1 {
-		parts := strings.Split(repository, "/")
-		if len(parts) > 2 {
-			repository = parts[0] + "/" + parts[1]
-		}
+// ExtractOwnerRepo extracts the "owner/repo" base from an action path
+// that may include subpaths (e.g., "owner/repo/sub/path" → "owner/repo").
+// Returns false if the path doesn't contain a valid owner/repo pair.
+func ExtractOwnerRepo(actionPath string) (string, bool) {
+	parts := strings.Split(actionPath, "/")
+	if len(parts) < 2 {
+		return "", false
 	}
-	return repository
+
+	owner := parts[0]
+	repo := parts[1]
+	if owner == "" || repo == "" {
+		return "", false
+	}
+
+	return owner + "/" + repo, true
 }

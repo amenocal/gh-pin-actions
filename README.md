@@ -67,6 +67,7 @@ Usage:
 
 Flags:
   -h, --help        help for workflows
+      --latest      resolve external version refs to the latest stable release before pinning
   -o, --overwrite   overwrite existing workflow files
 
 Global Flags:
@@ -77,6 +78,32 @@ Example:
 
 ```sh
 gh pin-actions workflows
+```
+
+When `--latest` is enabled:
+
+- Version refs (for example `actions/checkout@v4`) resolve to the latest stable release for that action before pinning.
+- SHA-pinned external refs ignore the current SHA and resolve `latest` from the base `owner/repo`.
+- The full action subpath is preserved when repinning (for example `owner/repo/path/to/action@...` stays `owner/repo/path/to/action@...`).
+- Branch refs keep branch semantics and pin the branch head (`#main`, `#release/v1.2`, etc.).
+- Local (`./...`) and unsupported refs (for example `docker://...`) are left unchanged.
+
+Practical `--latest` example:
+
+```yaml
+# before
+- uses: actions/checkout@v4
+- uses: owner/repo/path/to/action@0123456789abcdef0123456789abcdef01234567
+- uses: owner/repo/path/to/action@main
+- uses: ./.github/actions/setup
+- uses: docker://alpine:3.20
+
+# after running: gh pin-actions workflows --latest
+- uses: actions/checkout@<resolved-sha> #v4.x.y
+- uses: owner/repo/path/to/action@<resolved-sha> #v9.9.9
+- uses: owner/repo/path/to/action@<resolved-sha> #main
+- uses: ./.github/actions/setup
+- uses: docker://alpine:3.20
 ```
 
 >**Note**

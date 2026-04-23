@@ -25,6 +25,7 @@ var (
 	}
 	logger             *pterm.Logger
 	overwriteWorkflows bool
+	latestWorkflows    bool
 )
 
 type Step struct {
@@ -46,6 +47,7 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	workflowsCmd.Flags().BoolVarP(&overwriteWorkflows, "overwrite", "o", false, "overwrite existing workflow files")
+	workflowsCmd.Flags().BoolVar(&latestWorkflows, "latest", false, "pin actions to the latest available release tags")
 	// rootCmd.MarkFlagRequired("repository")
 
 	// rootCmd.Flags().StringVarP(&version, "version", "v", "latest", "version of the tag to pin to (ex. 3; 3.1; 3.1.1)")
@@ -67,8 +69,9 @@ func processWorkflows(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	resolutionCache := newActionResolutionCache()
 	for _, file := range workflowFiles {
-		processActionsYaml(file)
+		processActionsYaml(file, latestWorkflows, resolutionCache)
 	}
 }
 
@@ -90,7 +93,7 @@ func getWorkflowFiles() ([]string, error) {
 	return workflowFiles, nil
 }
 
-func processActionsYaml(workflow string) {
+func processActionsYaml(workflow string, latestMode bool, resolutionCache pkg.ActionResolutionCache) {
 	var wf Workflow
 	data, err := os.ReadFile(workflow)
 	logger.Print("Processing workflow", logger.Args("file:", workflow))
@@ -107,29 +110,23 @@ func processActionsYaml(workflow string) {
 		logger.Warn("Error creating temp file", logger.Args("file:", workflow, "error:", err))
 	}
 
-	// Compile the regular expression before the loop
-	regHash, err := regexp.Compile(`@[0-9a-f]{40}`)
-	if err != nil {
-		logger.Warn("Error compiling Hash regex", logger.Args("error:", err))
-	}
-
 	// Loop through all the jobs and steps
 	for _, job := range wf.Jobs {
 		for i, step := range job.Steps {
 			logger.Trace("Processing Step", logger.Args("step:", fmt.Sprintf("%d %s", i+1, step.Name)))
 			if action := step.Uses; action != "" {
-				if matched := regHash.MatchString(action); matched {
-					// Action already has a hash
-					logger.Info("Action already has a hash", logger.Args("action:", action))
+				actionWithSha, shouldUpdate, err := processActionWithCache(action, latestMode, resolutionCache)
+				if err != nil {
+					logger.Warn("Nothing will be updated", logger.Args("action:", action, "error:", err))
 					continue
-				} else {
-					// Actions doesn't have a hash
-					actionWithSha, err := processAction(action)
-					if err != nil {
-						logger.Warn("Nothing will be updated")
-					}
-					writeModifiedWorkflowToFile(pinnedWorkflow, action, actionWithSha)
 				}
+				if !shouldUpdate {
+					continue
+				}
+				if latestMode {
+					logger.Info("Updating to latest", logger.Args("from:", action, "to:", actionWithSha))
+				}
+				writeModifiedWorkflowToFile(pinnedWorkflow, action, actionWithSha)
 			}
 		}
 	}
@@ -149,12 +146,18 @@ func processActionsYaml(workflow string) {
 func writeModifiedWorkflowToFile(fileName string, action string, actionWithSha string) {
 	if action == "" || actionWithSha == "" {
 		logger.Error("action or actionWithSha are empty", logger.Args("action:", action, "actionWithSha:", actionWithSha))
+		return
 	}
 	newFileContent, err := os.ReadFile(fileName)
 	if err != nil {
 		logger.Warn("Error reading file", logger.Args("file:", fileName, "error:", err))
+		return
 	}
-	modifiedContent := strings.Replace(string(newFileContent), action, actionWithSha, 1)
+	// Match the action plus any trailing inline #comment on the same line so that
+	// re-pinning an already-pinned action (e.g. with --latest) replaces the old
+	// version comment instead of leaving it alongside the new one.
+	pattern := regexp.MustCompile(regexp.QuoteMeta(action) + `(?:[ \t]+#[^\r\n]*)?`)
+	modifiedContent := pattern.ReplaceAllLiteralString(string(newFileContent), actionWithSha)
 	err = os.WriteFile(fileName, []byte(modifiedContent), 0644)
 	if err != nil {
 		logger.Warn("Error creating file", logger.Args("file:", fileName, "error:", err))
@@ -179,61 +182,34 @@ func createTempYAMLFile(fileName string) (string, error) {
 	return newFileName, nil
 }
 
-func processActionWithVersion(actionWithVersion string) (string, error) {
-	repoWithOwner, versionParsed, err := pkg.SplitActionString(actionWithVersion, "@v")
-	if err != nil {
-		return "", err
-	}
-	actionVersion := pkg.FormatVersion(versionParsed)
-	commitSha, tagVersion, err := GetActionHashByVersion(repoWithOwner, actionVersion)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s@%s #%s", repoWithOwner, strings.TrimSpace(commitSha), strings.TrimSpace(tagVersion)), nil
-
+func newActionResolutionCache() pkg.ActionResolutionCache {
+	return pkg.NewActionResolutionCache()
 }
 
-func processActionWithBranch(actionWithBranch string) (string, error) {
-	repoWithOwner, branchName, err := pkg.SplitActionString(actionWithBranch, "@")
-	if err != nil {
-		return "", err
+func warnUsesResolutionFailure(action string, err error) {
+	if logger == nil {
+		return
 	}
-	commitSha, err := GetBranchHash(repoWithOwner, branchName)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s@%s #%s", repoWithOwner, strings.TrimSpace(commitSha), strings.TrimSpace(branchName)), nil
+	logger.Warn("Unable to resolve action, keeping original uses value", logger.Args("action:", action, "error:", err))
 }
 
-func processAction(action string) (string, error) {
-	var actionWithSha string
-	branchRegex, err := regexp.Compile(`^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+$`)
-	if err != nil {
-		logger.Warn("Error compiling branch regex", logger.Args("error:", err))
-	}
-	if strings.Contains(action, "@v") {
-		// Action has a version
-		actionWithVersion := action
-		actionWithSha, err = processActionWithVersion(actionWithVersion)
-		if err != nil {
-			logger.Error("Error getting commit sha for action", logger.Args("action:", actionWithVersion, "error:", err))
-			actionWithSha = actionWithVersion
-			return actionWithSha, err
-		}
+type workflowResolverBackends struct {
+	resolveByVersion pkg.ActionVersionResolver
+	resolveByBranch  pkg.ActionBranchResolver
+}
 
-	} else if branchRegex.MatchString(action) {
-		// Action has a branch
-		actionWithBranch := action
-		actionWithSha, err = processActionWithBranch(actionWithBranch)
-		if err != nil {
-			logger.Error("Error getting commit sha for action with Branch", logger.Args("action:", actionWithBranch, "error:", err))
-			actionWithSha = actionWithBranch
-			return actionWithSha, err
-		}
-	} else if strings.Contains(action, "./") {
-		// Action is local
-		logger.Info("Action is local", logger.Args("action:", action))
-		return action, nil
+func defaultWorkflowResolverBackends() workflowResolverBackends {
+	return workflowResolverBackends{
+		resolveByVersion: GetActionHashByVersion,
+		resolveByBranch:  GetBranchHash,
 	}
-	return actionWithSha, nil
+}
+
+func processActionWithCache(action string, latestMode bool, resolutionCache pkg.ActionResolutionCache) (string, bool, error) {
+	backends := defaultWorkflowResolverBackends()
+	return processActionWithCacheWithResolvers(action, latestMode, resolutionCache, backends.resolveByVersion, backends.resolveByBranch)
+}
+
+func processActionWithCacheWithResolvers(action string, latestMode bool, resolutionCache pkg.ActionResolutionCache, resolveByVersion pkg.ActionVersionResolver, resolveByBranch pkg.ActionBranchResolver) (string, bool, error) {
+	return pkg.ProcessActionWithCache(action, latestMode, resolutionCache, resolveByVersion, resolveByBranch, warnUsesResolutionFailure)
 }

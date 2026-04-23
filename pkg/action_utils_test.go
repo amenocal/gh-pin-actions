@@ -1,52 +1,112 @@
 package pkg
 
 import (
-	"fmt"
 	"testing"
 )
 
-func TestSplitActionString(t *testing.T) {
-	tests := []struct {
-		action      string
-		delimiter   string
-		expected1   string
-		expected2   string
-		expectedErr error
-	}{
-		{"owner/repo@v3", "@v", "owner/repo", "3", nil},
-		{"owner/repo@main", "@", "owner/repo", "main", nil},
-		{"owner/repo@v3.3.3", "@v", "owner/repo", "3.3.3", nil},
-		{"repo", "/", "", "", fmt.Errorf("invalid action format: repo")},
-		{"repo", "|", "", "", fmt.Errorf("invalid action format: repo")},
-	}
-
-	for _, test := range tests {
-		result1, result2, err := SplitActionString(test.action, test.delimiter)
-		if err != nil && test.expectedErr == nil {
-			t.Errorf("Unexpected error for action %s: %v", test.action, err)
-		} else if err == nil && test.expectedErr != nil {
-			t.Errorf("Expected error for action %s: %v", test.action, test.expectedErr)
-		} else if result1 != test.expected1 || result2 != test.expected2 {
-			t.Errorf("Unexpected result for action %s: got (%s, %s), want (%s, %s)", test.action, result1, result2, test.expected1, test.expected2)
-		}
-	}
-}
 func TestExtractOwnerRepo(t *testing.T) {
 	tests := []struct {
-		repository string
-		expected   string
+		name         string
+		actionPath   string
+		expectedRepo string
+		expectedOK   bool
 	}{
-		{"owner/repo", "owner/repo"},
-		{"owner/repo/sub", "owner/repo"},
-		{"owner/repo/sub/sub", "owner/repo"},
-		{"repo", "repo"},
-		{"", ""},
+		{
+			name:         "owner repo only",
+			actionPath:   "owner/repo",
+			expectedRepo: "owner/repo",
+			expectedOK:   true,
+		},
+		{
+			name:         "owner repo with subpath",
+			actionPath:   "owner/repo/path/to/action",
+			expectedRepo: "owner/repo",
+			expectedOK:   true,
+		},
+		{
+			name:         "owner repo with single subpath",
+			actionPath:   "owner/repo/sub",
+			expectedRepo: "owner/repo",
+			expectedOK:   true,
+		},
+		{
+			name:       "missing repo",
+			actionPath: "owner/",
+			expectedOK: false,
+		},
+		{
+			name:       "missing owner",
+			actionPath: "/repo",
+			expectedOK: false,
+		},
+		{
+			name:       "single path segment",
+			actionPath: "repo",
+			expectedOK: false,
+		},
+		{
+			name:       "empty string",
+			actionPath: "",
+			expectedOK: false,
+		},
 	}
 
 	for _, test := range tests {
-		result := ExtractOwnerRepo(test.repository)
-		if result != test.expected {
-			t.Errorf("Unexpected result for repository %s: got %s, want %s", test.repository, result, test.expected)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			repo, ok := ExtractOwnerRepo(test.actionPath)
+			if repo != test.expectedRepo || ok != test.expectedOK {
+				t.Errorf("ExtractOwnerRepo(%q) = (%q, %t), want (%q, %t)", test.actionPath, repo, ok, test.expectedRepo, test.expectedOK)
+			}
+		})
 	}
 }
+
+func TestSplitOnLastAt(t *testing.T) {
+	tests := []struct {
+		name         string
+		value        string
+		expectedPath string
+		expectedRef  string
+		expectedHas  bool
+	}{
+		{
+			name:         "splits once",
+			value:        "actions/checkout@v4",
+			expectedPath: "actions/checkout",
+			expectedRef:  "v4",
+			expectedHas:  true,
+		},
+		{
+			name:         "splits on final at",
+			value:        "owner/repo@release@candidate",
+			expectedPath: "owner/repo@release",
+			expectedRef:  "candidate",
+			expectedHas:  true,
+		},
+		{
+			name:         "no at",
+			value:        "actions/checkout",
+			expectedPath: "actions/checkout",
+			expectedRef:  "",
+			expectedHas:  false,
+		},
+		{
+			name:         "trailing at",
+			value:        "owner/repo@",
+			expectedPath: "owner/repo",
+			expectedRef:  "",
+			expectedHas:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path, ref, hasRef := splitOnLastAt(test.value)
+			if path != test.expectedPath || ref != test.expectedRef || hasRef != test.expectedHas {
+				t.Errorf("splitOnLastAt(%q) = (%q, %q, %t), want (%q, %q, %t)", test.value, path, ref, hasRef, test.expectedPath, test.expectedRef, test.expectedHas)
+			}
+		})
+	}
+}
+
+
