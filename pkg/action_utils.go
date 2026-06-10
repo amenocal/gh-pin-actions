@@ -37,12 +37,13 @@ func RepoFromPinnedRef(action string) (string, error) {
 }
 
 // ReplaceActionRef replaces the first occurrence of a SHA-pinned action ref (and its optional
-// trailing comment) in content with replacement, returning the updated content and whether a match
-// was found. Splice replacement avoids regexp `$` expansion and guarantees exactly one occurrence is
-// replaced; the optional `[ \t]+#[^\r\n]*` group is CRLF/tab-safe so it consumes a stale comment
-// without disturbing line endings.
+// trailing version comment) in content with replacement, returning the updated content and whether a
+// match was found. Splice replacement avoids regexp `$` expansion and guarantees exactly one
+// occurrence is replaced. The optional `[ \t]+#[ \t]*\S+` group consumes only the stale version
+// marker (e.g. `# v4.1.1`), leaving any subsequent user comment (e.g. ` # keep`) intact, and is
+// CRLF/tab-safe so it doesn't disturb line endings.
 func ReplaceActionRef(content, action, replacement string) (string, bool) {
-	re := regexp.MustCompile(regexp.QuoteMeta(action) + `([ \t]+#[^\r\n]*)?`)
+	re := regexp.MustCompile(regexp.QuoteMeta(action) + `([ \t]+#[ \t]*\S+)?`)
 	loc := re.FindStringIndex(content)
 	if loc == nil {
 		return content, false

@@ -139,11 +139,11 @@ func TestReplaceActionRef(t *testing.T) {
 			wantMatched: true,
 		},
 		{
-			name:        "comment with extra hash fully replaced",
+			name:        "comment with extra hash preserves trailing note",
 			content:     "      - uses: actions/checkout@" + shaA + " # v4.1.1 # keep\n",
 			action:      "actions/checkout@" + shaA,
 			replacement: "actions/checkout@" + shaB + " #v4.2.2",
-			want:        "      - uses: actions/checkout@" + shaB + " #v4.2.2\n",
+			want:        "      - uses: actions/checkout@" + shaB + " #v4.2.2 # keep\n",
 			wantMatched: true,
 		},
 		{
