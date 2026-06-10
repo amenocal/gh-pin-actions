@@ -22,11 +22,12 @@ func TestSplitActionString(t *testing.T) {
 
 	for _, test := range tests {
 		result1, result2, err := SplitActionString(test.action, test.delimiter)
-		if err != nil && test.expectedErr == nil {
+		switch {
+		case err != nil && test.expectedErr == nil:
 			t.Errorf("Unexpected error for action %s: %v", test.action, err)
-		} else if err == nil && test.expectedErr != nil {
+		case err == nil && test.expectedErr != nil:
 			t.Errorf("Expected error for action %s: %v", test.action, test.expectedErr)
-		} else if result1 != test.expected1 || result2 != test.expected2 {
+		case result1 != test.expected1 || result2 != test.expected2:
 			t.Errorf("Unexpected result for action %s: got (%s, %s), want (%s, %s)", test.action, result1, result2, test.expected1, test.expected2)
 		}
 	}

@@ -45,7 +45,7 @@ func FindHighestPatchVersion(tags []string, version string) (string, error) {
 		tags = tags[:len(tags)-1]
 	}
 
-	//sort tags in descending order
+	// sort tags in descending order
 	sort.Strings(tags)
 	sort.Slice(tags, func(i, j int) bool {
 		return tags[i] > tags[j]
@@ -64,11 +64,9 @@ func FindHighestPatchVersion(tags []string, version string) (string, error) {
 				semverVersion = tagVersion
 				break
 			}
-		} else {
-			if fmt.Sprintf("%d", tagVersion.Major) == version {
-				semverVersion = tagVersion
-				break
-			}
+		} else if fmt.Sprintf("%d", tagVersion.Major) == version {
+			semverVersion = tagVersion
+			break
 		}
 	}
 	return fmt.Sprintf("v%d.%d.%d", semverVersion.Major, semverVersion.Minor, semverVersion.Patch), nil
@@ -76,7 +74,7 @@ func FindHighestPatchVersion(tags []string, version string) (string, error) {
 
 func FormatVersion(version string) string {
 	if strings.HasPrefix(version, "v") && !strings.Contains(version, ".") {
-		version = version + ".0."
+		version += ".0."
 	}
 	return version
 }

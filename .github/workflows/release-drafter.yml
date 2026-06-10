@@ -4,8 +4,11 @@ on:
     branches:
       - main
     paths-ignore:
-      - 'README.md'
-      - '.github/**'
+      - "README.md"
+      - ".github/**"
+permissions:
+  contents: write
+  pull-requests: read
 jobs:
   update_release_draft:
     permissions:

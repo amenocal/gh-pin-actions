@@ -59,7 +59,10 @@ func TestGetWorkflowFiles(t *testing.T) {
 	}
 
 	// Override the directory for testing
-	originalDir, _ := os.Getwd()
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Unexpected error getting working directory: %v", err)
+	}
 	defer func() {
 		err := os.Chdir(originalDir)
 		if err != nil {
