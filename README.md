@@ -86,6 +86,8 @@ gh pin-actions workflows --latest
 
 Pins every version-tagged action (`owner/repo@vX`) to its newest GitHub release across all major versions, instead of the version declared in the workflow file. Branch-pinned (`@branch`) and local (`./...`) actions are unaffected.
 
+With `--latest`, actions that are already pinned to a SHA are also re-pinned to the newest release — both the commit SHA and the trailing `# version` comment are updated. Without `--latest`, already-pinned actions are left untouched.
+
 >**Note**
 >`gh pin-actions` will create a new file within your `.github/workflows` directory with the suffix `-pin`. This is to ensure that you can review the changes before committing them to your repository. Once you have reviewed the changes, you can then pass the `--overwrite` flag to overwrite your existing workflow files with the pin shas.
 

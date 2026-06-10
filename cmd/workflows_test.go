@@ -5,7 +5,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/pterm/pterm"
 )
+
+func TestMain(m *testing.M) {
+	// writePinnedActionUpdate and friends log via the package-level logger.
+	logger = pterm.DefaultLogger.WithLevel(pterm.LogLevelWarn)
+	// Guard against latestCache state leaking across the test binary's runs.
+	latestCache = map[string]latestResult{}
+	os.Exit(m.Run())
+}
 
 func TestSelectVersion(t *testing.T) {
 	tests := []struct {
@@ -119,5 +129,51 @@ func TestCreateTempYAMLFile(t *testing.T) {
 
 	if string(newContent) != string(content) {
 		t.Errorf("Expected content %s, got %s", string(content), string(newContent))
+	}
+}
+
+func TestWritePinnedActionUpdate(t *testing.T) {
+	const (
+		shaA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		shaB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		shaX = "cccccccccccccccccccccccccccccccccccccccc"
+	)
+	tests := []struct {
+		name          string
+		initial       string
+		action        string
+		actionWithSha string
+		want          string
+	}{
+		{
+			name:          "rewrites matching ref in file",
+			initial:       "      - uses: actions/checkout@" + shaA + " # v4.1.1\n",
+			action:        "actions/checkout@" + shaA,
+			actionWithSha: "actions/checkout@" + shaB + " #v4.2.2",
+			want:          "      - uses: actions/checkout@" + shaB + " #v4.2.2\n",
+		},
+		{
+			name:          "no match leaves file unchanged",
+			initial:       "      - uses: \"actions/checkout@" + shaA + "\"\n",
+			action:        "actions/missing@" + shaX,
+			actionWithSha: "actions/missing@" + shaB + " #v1.0.0",
+			want:          "      - uses: \"actions/checkout@" + shaA + "\"\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), "workflow.yml")
+			if err := os.WriteFile(file, []byte(tt.initial), 0644); err != nil {
+				t.Fatalf("Unexpected error writing initial file: %v", err)
+			}
+			writePinnedActionUpdate(file, tt.action, tt.actionWithSha)
+			got, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatalf("Unexpected error reading file: %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("writePinnedActionUpdate result = %q, want %q", string(got), tt.want)
+			}
+		})
 	}
 }
