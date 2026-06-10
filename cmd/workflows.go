@@ -25,6 +25,10 @@ var (
 	}
 	logger             *pterm.Logger
 	overwriteWorkflows bool
+	pinLatest          bool
+
+	hashRegexp   = regexp.MustCompile(`@[0-9a-f]{40}`)
+	branchRegexp = regexp.MustCompile(`^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+$`)
 )
 
 type Step struct {
@@ -46,6 +50,7 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	workflowsCmd.Flags().BoolVarP(&overwriteWorkflows, "overwrite", "o", false, "overwrite existing workflow files")
+	workflowsCmd.Flags().BoolVarP(&pinLatest, "latest", "l", false, "pin actions to the latest release across all major versions instead of the declared version")
 	// rootCmd.MarkFlagRequired("repository")
 
 	// rootCmd.Flags().StringVarP(&version, "version", "v", "latest", "version of the tag to pin to (ex. 3; 3.1; 3.1.1)")
@@ -53,7 +58,7 @@ func init() {
 
 }
 
-func processWorkflows(cmd *cobra.Command, args []string) {
+func processWorkflows(_ *cobra.Command, _ []string) {
 	debug = rootCmd.Flag("debug").Value.String() == "true"
 	if debug {
 		logger = pterm.DefaultLogger.WithLevel(pterm.LogLevelDebug)
@@ -107,29 +112,12 @@ func processActionsYaml(workflow string) {
 		logger.Warn("Error creating temp file", logger.Args("file:", workflow, "error:", err))
 	}
 
-	// Compile the regular expression before the loop
-	regHash, err := regexp.Compile(`@[0-9a-f]{40}`)
-	if err != nil {
-		logger.Warn("Error compiling Hash regex", logger.Args("error:", err))
-	}
-
 	// Loop through all the jobs and steps
 	for _, job := range wf.Jobs {
 		for i, step := range job.Steps {
 			logger.Trace("Processing Step", logger.Args("step:", fmt.Sprintf("%d %s", i+1, step.Name)))
 			if action := step.Uses; action != "" {
-				if matched := regHash.MatchString(action); matched {
-					// Action already has a hash
-					logger.Info("Action already has a hash", logger.Args("action:", action))
-					continue
-				} else {
-					// Actions doesn't have a hash
-					actionWithSha, err := processAction(action)
-					if err != nil {
-						logger.Warn("Nothing will be updated")
-					}
-					writeModifiedWorkflowToFile(pinnedWorkflow, action, actionWithSha)
-				}
+				pinActionInWorkflow(pinnedWorkflow, action)
 			}
 		}
 	}
@@ -146,6 +134,36 @@ func processActionsYaml(workflow string) {
 
 }
 
+// pinActionInWorkflow pins a single action reference in pinnedWorkflow. Already-hashed actions are
+// left untouched unless --latest is set, in which case they are re-pinned to the newest release;
+// version- or branch-tagged actions are resolved to their commit SHA.
+func pinActionInWorkflow(pinnedWorkflow string, action string) {
+	if hashRegexp.MatchString(action) {
+		if !pinLatest {
+			logger.Info("Action already has a hash", logger.Args("action:", action))
+			return
+		}
+		updated, changed, err := processPinnedActionToLatest(action)
+		if err != nil {
+			logger.Warn("Could not re-pin already-pinned action to latest; leaving as-is",
+				logger.Args("action:", action, "error:", err))
+			return
+		}
+		if !changed {
+			logger.Info("Action already pinned to latest", logger.Args("action:", action))
+			return
+		}
+		writePinnedActionUpdate(pinnedWorkflow, action, updated)
+		return
+	}
+	// Action doesn't have a hash
+	actionWithSha, err := processAction(action)
+	if err != nil {
+		logger.Warn("Nothing will be updated")
+	}
+	writeModifiedWorkflowToFile(pinnedWorkflow, action, actionWithSha)
+}
+
 func writeModifiedWorkflowToFile(fileName string, action string, actionWithSha string) {
 	if action == "" || actionWithSha == "" {
 		logger.Error("action or actionWithSha are empty", logger.Args("action:", action, "actionWithSha:", actionWithSha))
@@ -155,7 +173,7 @@ func writeModifiedWorkflowToFile(fileName string, action string, actionWithSha s
 		logger.Warn("Error reading file", logger.Args("file:", fileName, "error:", err))
 	}
 	modifiedContent := strings.Replace(string(newFileContent), action, actionWithSha, 1)
-	err = os.WriteFile(fileName, []byte(modifiedContent), 0644)
+	err = os.WriteFile(fileName, []byte(modifiedContent), 0600)
 	if err != nil {
 		logger.Warn("Error creating file", logger.Args("file:", fileName, "error:", err))
 	}
@@ -171,12 +189,21 @@ func createTempYAMLFile(fileName string) (string, error) {
 	tempFileName := strings.TrimSuffix(fileName, ".yml")
 	newFileName := tempFileName + "-pin.yml"
 
-	err = os.WriteFile(newFileName, []byte(content), 0644)
+	err = os.WriteFile(newFileName, content, 0600)
 	if err != nil {
 		logger.Warn("Error writing to file", logger.Args("file:", newFileName, "error:", err))
 		return "", err
 	}
 	return newFileName, nil
+}
+
+// selectVersion returns "latest" when pinLatest is set, otherwise the declared version.
+// "latest" overrides the default latest-patch-within-declared-major resolution in GetActionHashByVersion.
+func selectVersion(declared string, pinLatest bool) string {
+	if pinLatest {
+		return latestVersion
+	}
+	return declared
 }
 
 func processActionWithVersion(actionWithVersion string) (string, error) {
@@ -185,7 +212,7 @@ func processActionWithVersion(actionWithVersion string) (string, error) {
 		return "", err
 	}
 	actionVersion := pkg.FormatVersion(versionParsed)
-	commitSha, tagVersion, err := GetActionHashByVersion(repoWithOwner, actionVersion)
+	commitSha, tagVersion, err := GetActionHashByVersion(repoWithOwner, selectVersion(actionVersion, pinLatest))
 	if err != nil {
 		return "", err
 	}
@@ -207,11 +234,9 @@ func processActionWithBranch(actionWithBranch string) (string, error) {
 
 func processAction(action string) (string, error) {
 	var actionWithSha string
-	branchRegex, err := regexp.Compile(`^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+$`)
-	if err != nil {
-		logger.Warn("Error compiling branch regex", logger.Args("error:", err))
-	}
-	if strings.Contains(action, "@v") {
+	var err error
+	switch {
+	case strings.Contains(action, "@v"):
 		// Action has a version
 		actionWithVersion := action
 		actionWithSha, err = processActionWithVersion(actionWithVersion)
@@ -220,8 +245,7 @@ func processAction(action string) (string, error) {
 			actionWithSha = actionWithVersion
 			return actionWithSha, err
 		}
-
-	} else if branchRegex.MatchString(action) {
+	case branchRegexp.MatchString(action):
 		// Action has a branch
 		actionWithBranch := action
 		actionWithSha, err = processActionWithBranch(actionWithBranch)
@@ -230,10 +254,72 @@ func processAction(action string) (string, error) {
 			actionWithSha = actionWithBranch
 			return actionWithSha, err
 		}
-	} else if strings.Contains(action, "./") {
+	case strings.Contains(action, "./"):
 		// Action is local
 		logger.Info("Action is local", logger.Args("action:", action))
 		return action, nil
 	}
 	return actionWithSha, nil
+}
+
+type latestResult struct {
+	sha string
+	tag string
+	err error
+}
+
+// latestCache memoizes "latest" lookups per run, keyed by owner/repo so sub-paths share a lookup.
+var latestCache = map[string]latestResult{}
+
+func resolveLatest(repoWithOwner string) (string, string, error) {
+	key := pkg.ExtractOwnerRepo(repoWithOwner)
+	if r, ok := latestCache[key]; ok {
+		return r.sha, r.tag, r.err
+	}
+	sha, tag, err := GetActionHashByVersion(repoWithOwner, latestVersion)
+	latestCache[key] = latestResult{sha: sha, tag: tag, err: err}
+	return sha, tag, err
+}
+
+// processPinnedActionToLatest resolves an already-pinned action to the newest release. It returns the
+// rewritten "owner/repo@<sha> #<tag>" ref and whether the resolved SHA differs from the existing pin
+// (changed == false means the action is already on the latest SHA and can be skipped).
+func processPinnedActionToLatest(action string) (string, bool, error) {
+	repoWithOwner, err := pkg.RepoFromPinnedRef(action)
+	if err != nil {
+		return "", false, err
+	}
+	sha, tag, err := resolveLatest(repoWithOwner)
+	if err != nil {
+		return "", false, err
+	}
+	resolvedSha := strings.TrimSpace(sha)
+	oldSha := strings.TrimPrefix(action, repoWithOwner+"@")
+	changed := resolvedSha != oldSha
+	return fmt.Sprintf("%s@%s #%s", repoWithOwner, resolvedSha, strings.TrimSpace(tag)), changed, nil
+}
+
+// writePinnedActionUpdate rewrites the first occurrence of a SHA-pinned ref (and its trailing
+// comment) in fileName with actionWithSha, warning without writing when the ref cannot be located.
+func writePinnedActionUpdate(fileName string, action string, actionWithSha string) {
+	if action == "" || actionWithSha == "" {
+		logger.Error("action or actionWithSha are empty", logger.Args("action:", action, "actionWithSha:", actionWithSha))
+		return
+	}
+	content, err := os.ReadFile(fileName)
+	if err != nil {
+		logger.Warn("Error reading file", logger.Args("file:", fileName, "error:", err))
+		return
+	}
+	modifiedContent, matched := pkg.ReplaceActionRef(string(content), action, actionWithSha)
+	if !matched {
+		logger.Warn("Resolved latest but could not locate pinned ref in file text; leaving unchanged",
+			logger.Args("file:", fileName, "action:", action))
+		return
+	}
+	if err := os.WriteFile(fileName, []byte(modifiedContent), 0600); err != nil {
+		logger.Warn("Error writing file", logger.Args("file:", fileName, "error:", err))
+		return
+	}
+	logger.Info("Re-pinning action to latest", logger.Args("action:", action, "updated:", actionWithSha))
 }

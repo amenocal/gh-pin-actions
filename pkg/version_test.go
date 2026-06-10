@@ -20,11 +20,12 @@ func TestParseSemver(t *testing.T) {
 
 	for _, test := range tests {
 		result, err := ParseSemver(test.version)
-		if err != nil && test.err == nil {
+		switch {
+		case err != nil && test.err == nil:
 			t.Errorf("Unexpected error for version %s: %v", test.version, err)
-		} else if err == nil && test.err != nil {
+		case err == nil && test.err != nil:
 			t.Errorf("Expected error for version %s: %v", test.version, test.err)
-		} else if result != test.expected {
+		case result != test.expected:
 			t.Errorf("Unexpected result for version %s: got %v, want %v", test.version, result, test.expected)
 		}
 	}

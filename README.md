@@ -24,7 +24,7 @@ To use `gh pin-actions`, run the following command:
 ```sh
 gh pin-actions --help
 gh pin-actions is a CLI tool that pins actions to a specific sha
-                You can specify the repository and the version of the action you want to pin to and it will 
+                You can specify the repository and the version of the action you want to pin to and it will
                 return the pinnable action in the format owner/repo@sha #version
 
 Usage:
@@ -59,7 +59,7 @@ gh pin-actions -r actions/checkout -b main
 
 ```sh
  gh pin-actions workflows -h
-Update all workflow files in .github/workflows and reads every 
+Update all workflow files in .github/workflows and reads every
                 action with version in the workflow file and replaces it with the sha of the specific version
 
 Usage:
@@ -67,6 +67,7 @@ Usage:
 
 Flags:
   -h, --help        help for workflows
+  -l, --latest      pin actions to the latest release across all major versions instead of the declared version
   -o, --overwrite   overwrite existing workflow files
 
 Global Flags:
@@ -79,8 +80,17 @@ Example:
 gh pin-actions workflows
 ```
 
->**Note**
->`gh pin-actions` will create a new file within your `.github/workflows` directory with the suffix `-pin`. This is to ensure that you can review the changes before committing them to your repository. Once you have reviewed the changes, you can then pass the `--overwrite` flag to overwrite your existing workflow files with the pin shas.
+```sh
+gh pin-actions workflows --latest
+```
+
+Pins every version-tagged action (`owner/repo@vX`) to its newest GitHub release across all major versions, instead of the version declared in the workflow file. Branch-pinned (`@branch`) and local (`./...`) actions are unaffected.
+
+With `--latest`, actions that are already pinned to a SHA are also re-pinned to the newest release — both the commit SHA and the trailing `# version` comment are updated. Without `--latest`, already-pinned actions are left untouched.
+
+> **Note**
+>
+> `gh pin-actions` will create a new file within your `.github/workflows` directory with the suffix `-pin`. This is to ensure that you can review the changes before committing them to your repository. Once you have reviewed the changes, you can then pass the `--overwrite` flag to overwrite your existing workflow files with the pin shas.
 
 ## Contributing
 
