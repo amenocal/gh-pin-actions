@@ -25,6 +25,7 @@ var (
 	}
 	logger             *pterm.Logger
 	overwriteWorkflows bool
+	pinLatest          bool
 )
 
 type Step struct {
@@ -46,6 +47,7 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	workflowsCmd.Flags().BoolVarP(&overwriteWorkflows, "overwrite", "o", false, "overwrite existing workflow files")
+	workflowsCmd.Flags().BoolVarP(&pinLatest, "latest", "l", false, "pin actions to the latest release across all major versions instead of the declared version")
 	// rootCmd.MarkFlagRequired("repository")
 
 	// rootCmd.Flags().StringVarP(&version, "version", "v", "latest", "version of the tag to pin to (ex. 3; 3.1; 3.1.1)")
@@ -179,13 +181,22 @@ func createTempYAMLFile(fileName string) (string, error) {
 	return newFileName, nil
 }
 
+// selectVersion returns "latest" when pinLatest is set, otherwise the declared version.
+// "latest" overrides the default latest-patch-within-declared-major resolution in GetActionHashByVersion.
+func selectVersion(declared string, pinLatest bool) string {
+	if pinLatest {
+		return "latest"
+	}
+	return declared
+}
+
 func processActionWithVersion(actionWithVersion string) (string, error) {
 	repoWithOwner, versionParsed, err := pkg.SplitActionString(actionWithVersion, "@v")
 	if err != nil {
 		return "", err
 	}
 	actionVersion := pkg.FormatVersion(versionParsed)
-	commitSha, tagVersion, err := GetActionHashByVersion(repoWithOwner, actionVersion)
+	commitSha, tagVersion, err := GetActionHashByVersion(repoWithOwner, selectVersion(actionVersion, pinLatest))
 	if err != nil {
 		return "", err
 	}

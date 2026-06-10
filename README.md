@@ -67,6 +67,7 @@ Usage:
 
 Flags:
   -h, --help        help for workflows
+  -l, --latest      pin actions to the latest release across all major versions instead of the declared version
   -o, --overwrite   overwrite existing workflow files
 
 Global Flags:
@@ -78,6 +79,12 @@ Example:
 ```sh
 gh pin-actions workflows
 ```
+
+```sh
+gh pin-actions workflows --latest
+```
+
+Pins every version-tagged action (`owner/repo@vX`) to its newest GitHub release across all major versions, instead of the version declared in the workflow file. Branch-pinned (`@branch`) and local (`./...`) actions are unaffected.
 
 >**Note**
 >`gh pin-actions` will create a new file within your `.github/workflows` directory with the suffix `-pin`. This is to ensure that you can review the changes before committing them to your repository. Once you have reviewed the changes, you can then pass the `--overwrite` flag to overwrite your existing workflow files with the pin shas.

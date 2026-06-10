@@ -7,6 +7,27 @@ import (
 	"testing"
 )
 
+func TestSelectVersion(t *testing.T) {
+	tests := []struct {
+		name      string
+		declared  string
+		pinLatest bool
+		want      string
+	}{
+		{name: "declared kept when pinLatest false", declared: "v4.0.", pinLatest: false, want: "v4.0."},
+		{name: "latest when pinLatest true", declared: "v4.0.", pinLatest: true, want: "latest"},
+		{name: "empty declared with pinLatest true", declared: "", pinLatest: true, want: "latest"},
+		{name: "numeric declared kept when pinLatest false", declared: "3.1.1", pinLatest: false, want: "3.1.1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := selectVersion(tt.declared, tt.pinLatest); got != tt.want {
+				t.Errorf("selectVersion(%q, %v) = %q, want %q", tt.declared, tt.pinLatest, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGetWorkflowFiles(t *testing.T) {
 	// Setup: create a temporary directory with test files
 	tempDir := t.TempDir()
