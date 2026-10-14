@@ -17,6 +17,15 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestProcessActionSkipsLocalAndDocker(t *testing.T) {
+	for _, action := range []string{"docker://alpine:3.22", "docker://ghcr.io/foo/bar@v1", "./local@v1", "$/local"} {
+		got, err := processAction(action)
+		if err != nil || got != action {
+			t.Errorf("processAction(%q) = %q, %v; want unchanged", action, got, err)
+		}
+	}
+}
+
 func TestSelectVersion(t *testing.T) {
 	tests := []struct {
 		name      string
