@@ -18,11 +18,29 @@ func TestMain(m *testing.M) {
 }
 
 func TestProcessActionSkipsLocalAndDocker(t *testing.T) {
-	for _, action := range []string{"docker://alpine:3.22", "docker://ghcr.io/foo/bar@v1", "./local@v1", "$/local"} {
-		got, err := processAction(action)
-		if err != nil || got != action {
-			t.Errorf("processAction(%q) = %q, %v; want unchanged", action, got, err)
-		}
+	actions := []string{
+		"./",
+		"./local-action",
+		"./.github/actions/foo",
+		"./local@v1",
+		"./local@main",
+		"../shared/action",
+		"../shared/action@v1",
+		"$/local",
+		"$/local/action@v1",
+		"$/local@main",
+		"docker://alpine:3.22",
+		"docker://alpine@sha256:0123456789abcdef",
+		"docker://ghcr.io/foo/bar:latest",
+		"docker://ghcr.io/foo/bar@v1",
+	}
+	for _, action := range actions {
+		t.Run(action, func(t *testing.T) {
+			got, err := processAction(action)
+			if err != nil || got != action {
+				t.Errorf("processAction(%q) = %q, %v; want unchanged", action, got, err)
+			}
+		})
 	}
 }
 
