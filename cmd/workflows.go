@@ -236,6 +236,13 @@ func processAction(action string) (string, error) {
 	var actionWithSha string
 	var err error
 	switch {
+	case strings.HasPrefix(action, "docker://"):
+		logger.Info("Action is a docker reference", logger.Args("action:", action))
+		return action, nil
+	case strings.HasPrefix(action, "./") || strings.HasPrefix(action, "../") || strings.HasPrefix(action, "$/"):
+		// Action is local
+		logger.Info("Action is local", logger.Args("action:", action))
+		return action, nil
 	case strings.Contains(action, "@v"):
 		// Action has a version
 		actionWithVersion := action
@@ -254,10 +261,6 @@ func processAction(action string) (string, error) {
 			actionWithSha = actionWithBranch
 			return actionWithSha, err
 		}
-	case strings.Contains(action, "./"):
-		// Action is local
-		logger.Info("Action is local", logger.Args("action:", action))
-		return action, nil
 	}
 	return actionWithSha, nil
 }
