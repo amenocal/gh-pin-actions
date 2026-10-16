@@ -220,9 +220,9 @@ func TestPinActionInWorkflowKeepsUnsupportedRef(t *testing.T) {
 	}
 	pinActionInWorkflow(file, "o/r@1.2.3")
 	got, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
+	if err != nil {
+		t.Fatal(err)
+	}
 	if string(got) != content {
 		t.Errorf("file changed: %q", got)
 	}
