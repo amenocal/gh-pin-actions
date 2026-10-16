@@ -104,18 +104,12 @@ func TestGetWorkflowFiles(t *testing.T) {
 
 func TestCreateTempYAMLFile(t *testing.T) {
 	// Setup: create a temporary file
-	tempFile, err := os.CreateTemp("", "tempfile")
-	if err != nil {
-		t.Fatalf("Unexpected error creating temp file: %v", err)
-	}
-	defer tempFile.Close()
-
+	tempFileName := filepath.Join(t.TempDir(), "tempfile")
 	content := []byte("test content")
-	if _, err := tempFile.Write(content); err != nil {
-		t.Fatalf("Unexpected error writing to temp file: %v", err)
+	if err := os.WriteFile(tempFileName, content, 0600); err != nil {
+		t.Fatalf("Unexpected error writing temp file: %v", err)
 	}
 
-	tempFileName := tempFile.Name()
 	newFileName, err := createTempYAMLFile(tempFileName)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
