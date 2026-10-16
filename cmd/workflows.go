@@ -195,7 +195,7 @@ func writeModifiedWorkflowToFile(fileName string, action string, actionWithSha s
 	if err != nil {
 		logger.Warn("Error creating file", logger.Args("file:", fileName, "error:", err))
 	}
-	logger.Info("Replacing action with sha", logger.Args("action:", action, "sha:", actionWithSha))
+	logger.Info("Replacing action with pinned reference", logger.Args("action:", action, "reference:", actionWithSha))
 }
 
 // replaceFullUses replaces the first occurrence of action that is a complete ref, not merely a prefix
