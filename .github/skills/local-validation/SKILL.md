@@ -1,6 +1,6 @@
 ---
 name: local-validation
-description: Run the repo's CI checks locally (go build/vet/test, gofmt, Prettier, markdownlint, super-linter) before pushing. Use when preparing a PR or when the Source Linter / Build checks fail.
+description: Run the repository's CI checks locally (go build/vet/test, gofmt, Prettier, markdownlint, super-linter) before pushing. Use when preparing a PR or when the Source Linter / Build checks fail.
 ---
 
 # Local validation
@@ -10,7 +10,7 @@ CI runs two workflows: `.github/workflows/ci.yml` (Build) and `.github/workflows
 
 ## Line endings
 
-The repo is LF only (`.gitattributes`, `.editorconfig`). Do not use `core.autocrlf`:
+The repository is LF only (`.gitattributes`, `.editorconfig`). Do not use `core.autocrlf`:
 
 ```sh
 git config core.autocrlf false
@@ -45,10 +45,10 @@ npx --yes prettier --write README.md      # fix a single file
 npx --yes markdownlint-cli README.md
 ```
 
-Common markdownlint pitfalls: MD028 (blank line between two blockquotes; join them with a
+Common markdownlint pitfalls: MD028 (empty line between two blockquotes; join them with a
 bare `>` line) and Prettier rewriting blockquotes.
 
-## Super-linter with the repo config
+## Super-linter with the repository config
 
 The configuration lives in the `env:` block of `.github/workflows/linter.yml`. Mirror it when
 running the same image. Use `wslc` (WSL containers) or `docker`; the commands are the same.
