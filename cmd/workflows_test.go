@@ -180,3 +180,70 @@ func TestWritePinnedActionUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestReplaceFullUsesRepeatedReference(t *testing.T) {
+	content := "steps:\n  - uses: o/r@v1\n  - uses: o/r@v1\n  - uses: o/r@v10\n"
+	got := replaceFullUses(content, "o/r@v1", "o/r@v1.2.3")
+	got = replaceFullUses(got, "o/r@v1", "o/r@v1.2.3")
+	want := "steps:\n  - uses: o/r@v1.2.3\n  - uses: o/r@v1.2.3\n  - uses: o/r@v10\n"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestPinActionInWorkflowKeepsUnsupportedRef(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "w.yml")
+	content := "steps:\n  - uses: o/r@1.2.3\n"
+	if err := os.WriteFile(file, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	pinActionInWorkflow(file, "o/r@1.2.3")
+	got, _ := os.ReadFile(file)
+	if string(got) != content {
+		t.Errorf("file changed: %q", got)
+	}
+}
+
+func TestPinActionInWorkflowSkipsImmutableTags(t *testing.T) {
+	for _, ref := range []string{"1", "1.2.3", "v1.2.3"} {
+		immutableCache["o/r@"+ref] = true
+		file := filepath.Join(t.TempDir(), "w.yml")
+		content := "steps:\n  - uses: o/r@" + ref + "\n"
+		if err := os.WriteFile(file, []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+		pinActionInWorkflow(file, "o/r@"+ref)
+		got, _ := os.ReadFile(file)
+		if string(got) != content {
+			t.Errorf("%s: file changed: %q", ref, got)
+		}
+	}
+}
+
+func TestPinActionInWorkflowLatestUpgradesImmutableTag(t *testing.T) {
+	oldLatest := pinLatest
+	pinLatest = true
+	defer func() { pinLatest = oldLatest }()
+	sha := strings.Repeat("a", 40)
+	immutableCache["lt/repo@1.0.0"] = true
+	immutableCache["lt/repo@3.0.0"] = true
+	immutableCache["lt/mut@1.0.0"] = true
+	immutableCache["lt/mut@v3.0.0"] = false
+	latestCache["lt/repo"] = latestResult{sha: sha, tag: "3.0.0"}
+	latestCache["lt/mut"] = latestResult{sha: sha, tag: "v3.0.0"}
+	tests := []struct{ action, want string }{
+		{"lt/repo@1.0.0", "lt/repo@3.0.0"},
+		{"lt/mut@1.0.0", "lt/mut@" + sha + " #v3.0.0"},
+	}
+	for _, tt := range tests {
+		file := filepath.Join(t.TempDir(), "w.yml")
+		if err := os.WriteFile(file, []byte("  - uses: "+tt.action+"\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		pinActionInWorkflow(file, tt.action)
+		got, _ := os.ReadFile(file)
+		if string(got) != "  - uses: "+tt.want+"\n" {
+			t.Errorf("%s: got %q, want %q", tt.action, got, tt.want)
+		}
+	}
+}
