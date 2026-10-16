@@ -216,8 +216,7 @@ func processActionWithVersion(actionWithVersion string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s@%s #%s", repoWithOwner, strings.TrimSpace(commitSha), strings.TrimSpace(tagVersion)), nil
-
+	return BuildPinnedRef(repoWithOwner, commitSha, tagVersion, IsReleaseImmutable(repoWithOwner, tagVersion)), nil
 }
 
 func processActionWithBranch(actionWithBranch string) (string, error) {
@@ -295,8 +294,11 @@ func processPinnedActionToLatest(action string) (string, bool, error) {
 	}
 	resolvedSha := strings.TrimSpace(sha)
 	oldSha := strings.TrimPrefix(action, repoWithOwner+"@")
+	if IsReleaseImmutable(repoWithOwner, tag) {
+		return BuildPinnedRef(repoWithOwner, resolvedSha, tag, true), true, nil
+	}
 	changed := resolvedSha != oldSha
-	return fmt.Sprintf("%s@%s #%s", repoWithOwner, resolvedSha, strings.TrimSpace(tag)), changed, nil
+	return BuildPinnedRef(repoWithOwner, resolvedSha, tag, false), changed, nil
 }
 
 // writePinnedActionUpdate rewrites the first occurrence of a SHA-pinned ref (and its trailing

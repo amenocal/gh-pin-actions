@@ -90,6 +90,8 @@ With `--latest`, actions that are already pinned to a SHA are also re-pinned to 
 
 > **Note**
 >
+**Immutable releases:** if the resolved tag belongs to an [immutable release](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/immutable-releases), the action is pinned to that tag (e.g. `owner/repo@v1.2.3`) instead of a SHA, since the tag cannot be moved and carries a release attestation. Mutable tags and branches are still pinned to a SHA.
+
 > `gh pin-actions` will create a new file within your `.github/workflows` directory with the suffix `-pin`. This is to ensure that you can review the changes before committing them to your repository. Once you have reviewed the changes, you can then pass the `--overwrite` flag to overwrite your existing workflow files with the pin shas.
 
 ## Contributing

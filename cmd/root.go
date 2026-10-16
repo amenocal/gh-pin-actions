@@ -98,7 +98,8 @@ func ActionsPin(_ *cobra.Command, _ []string) {
 		logger.Error("Unable to get sha of Version", logger.Args("version:", version), logger.Args("error:", err))
 		os.Exit(0)
 	}
-	pinnableAction := fmt.Sprintf("%s@%s #%s", repository, strings.TrimSpace(shaCommit), strings.TrimSpace(tagVersion))
+	immutable := branchName == "" && IsReleaseImmutable(repository, tagVersion)
+	pinnableAction := BuildPinnedRef(repository, shaCommit, tagVersion, immutable)
 	fmt.Println(pinnableAction)
 	// fmt.Println(string(shaCommit.String()))
 }
@@ -135,6 +136,33 @@ func GetActionHashByVersion(repository string, version string) (string, string, 
 	}
 	sha := strings.TrimSpace(shaCommit.String())
 	return sha, tagVersion, nil
+}
+
+var immutableCache = map[string]bool{}
+
+// IsReleaseImmutable reports whether the release for tag is an immutable release. Any lookup failure
+// (no release for the tag, older GHES without the field, ...) is treated as mutable so we fall back to SHA pinning.
+func IsReleaseImmutable(repository string, tag string) bool {
+	repository = pkg.ExtractOwnerRepo(repository)
+	tag = strings.TrimSpace(tag)
+	key := repository + "@" + tag
+	if v, ok := immutableCache[key]; ok {
+		return v
+	}
+	out, _, err := gh.Exec("api", fmt.Sprintf("repos/%s/releases/tags/%s", repository, tag), "--jq", ".immutable")
+	immutable := err == nil && strings.TrimSpace(out.String()) == "true"
+	immutableCache[key] = immutable
+	return immutable
+}
+
+// BuildPinnedRef returns the ref to write for a resolved tag: the tag itself when its release is
+// immutable (readable, and backed by the release attestation), otherwise "repo@sha #tag".
+func BuildPinnedRef(repository, sha, tag string, immutable bool) string {
+	sha, tag = strings.TrimSpace(sha), strings.TrimSpace(tag)
+	if immutable {
+		return fmt.Sprintf("%s@%s", repository, tag)
+	}
+	return fmt.Sprintf("%s@%s #%s", repository, sha, tag)
 }
 
 func GetLatestPatchVersion(repository string, version string) (string, error) {
