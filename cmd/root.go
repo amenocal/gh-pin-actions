@@ -125,7 +125,7 @@ func GetActionHashByVersion(repository string, version string) (string, string, 
 	// for me the cliArgs to get the commit sha based on the tag Version
 	cliArgs := fmt.Sprintf(".[] | select(.name == \"%s\") | .commit.sha", strings.TrimSpace(tagVersion))
 	cliOptions := fmt.Sprintf("repos/%s/tags", repository)
-	shaCommit, stdErr, err := gh.Exec("api", cliOptions, "--jq", cliArgs)
+	shaCommit, stdErr, err := gh.Exec("api", cliOptions, "--paginate", "--jq", cliArgs)
 	if err != nil {
 		return "", tagVersion, err
 	}
@@ -143,7 +143,7 @@ func GetLatestPatchVersion(repository string, version string) (string, error) {
 	}
 	cliArgs := ".[] | .name"
 	cliOptions := fmt.Sprintf("repos/%s/tags", repository)
-	tagsBuffer, stdErr, err := gh.Exec("api", cliOptions, "--jq", cliArgs)
+	tagsBuffer, stdErr, err := gh.Exec("api", cliOptions, "--paginate", "--jq", cliArgs)
 	if err != nil {
 		logger.Error("Issue with gh api and getting specific major.minor.version tag", logger.Args("error:", stdErr.String(), "action", fmt.Sprintf("%s@%s", repository, version)))
 		return fmt.Sprintf("v%s", version), err

@@ -45,14 +45,23 @@ func FindHighestPatchVersion(tags []string, version string) (string, error) {
 		tags = tags[:len(tags)-1]
 	}
 
-	// sort tags in descending order
-	sort.Strings(tags)
-	sort.Slice(tags, func(i, j int) bool {
-		return tags[i] > tags[j]
+	// sort tags in descending semver order (numeric, not lexical: v6.3.16 > v6.3.8)
+	sort.SliceStable(tags, func(i, j int) bool {
+		a, errA := ParseSemver(tags[i])
+		b, errB := ParseSemver(tags[j])
+		if errA != nil || errB != nil {
+			return errA == nil && errB != nil
+		}
+		if a.Major != b.Major {
+			return a.Major > b.Major
+		}
+		if a.Minor != b.Minor {
+			return a.Minor > b.Minor
+		}
+		return a.Patch > b.Patch
 	})
 
 	for _, tag := range tags {
-
 		tagVersion, err := ParseSemver(tag)
 		if err != nil {
 			continue

@@ -54,3 +54,15 @@ func TestFindHighestPatchVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestFindHighestPatchVersionNumericOrder(t *testing.T) {
+	tags := []string{"v6.3.8", "v6.3.16", "v6.3.9", "v6.10.0", "v6.2.20", "latest", ""}
+	got, err := FindHighestPatchVersion(tags, "6")
+	if err != nil || got != "v6.10.0" {
+		t.Errorf("major: got %s, err %v", got, err)
+	}
+	got, err = FindHighestPatchVersion(tags, "6.3")
+	if err != nil || got != "v6.3.16" {
+		t.Errorf("minor: got %s, err %v", got, err)
+	}
+}
