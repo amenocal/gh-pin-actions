@@ -219,7 +219,10 @@ func TestPinActionInWorkflowKeepsUnsupportedRef(t *testing.T) {
 		t.Fatal(err)
 	}
 	pinActionInWorkflow(file, "o/r@1.2.3")
-	got, _ := os.ReadFile(file)
+	got, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
 	if string(got) != content {
 		t.Errorf("file changed: %q", got)
 	}
@@ -234,7 +237,10 @@ func TestPinActionInWorkflowSkipsImmutableTags(t *testing.T) {
 			t.Fatal(err)
 		}
 		pinActionInWorkflow(file, "o/r@"+ref)
-		got, _ := os.ReadFile(file)
+		got, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if string(got) != content {
 			t.Errorf("%s: file changed: %q", ref, got)
 		}
@@ -262,7 +268,10 @@ func TestPinActionInWorkflowLatestUpgradesImmutableTag(t *testing.T) {
 			t.Fatal(err)
 		}
 		pinActionInWorkflow(file, tt.action)
-		got, _ := os.ReadFile(file)
+		got, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if string(got) != "  - uses: "+tt.want+"\n" {
 			t.Errorf("%s: got %q, want %q", tt.action, got, tt.want)
 		}

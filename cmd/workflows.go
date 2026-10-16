@@ -201,10 +201,6 @@ func writeModifiedWorkflowToFile(fileName string, action string, actionWithSha s
 // replaceFullUses replaces the first occurrence of action that is a complete ref, not merely a prefix
 // of a longer one (e.g. "o/r@v1" must not match inside an already-updated "o/r@v1.2.3").
 func replaceFullUses(content, action, replacement string) string {
-	isRefChar := func(b byte) bool {
-		return b == '.' || b == '-' || b == '_' || b == '/' || b == '@' ||
-			(b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
-	}
 	for start := 0; start < len(content); {
 		idx := strings.Index(content[start:], action)
 		if idx < 0 {
@@ -212,12 +208,23 @@ func replaceFullUses(content, action, replacement string) string {
 		}
 		idx += start
 		end := idx + len(action)
-		if (idx == 0 || !isRefChar(content[idx-1])) && (end == len(content) || !isRefChar(content[end])) {
+		if isRefBoundary(content, idx-1) && isRefBoundary(content, end) {
 			return content[:idx] + replacement + content[end:]
 		}
 		start = idx + 1
 	}
 	return content
+}
+
+// isRefBoundary reports whether position i is outside content or holds a non-ref character.
+func isRefBoundary(content string, i int) bool {
+	if i < 0 || i >= len(content) {
+		return true
+	}
+	b := content[i]
+	isRefChar := b == '.' || b == '-' || b == '_' || b == '/' || b == '@' ||
+		(b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+	return !isRefChar
 }
 
 func createTempYAMLFile(fileName string) (string, error) {
