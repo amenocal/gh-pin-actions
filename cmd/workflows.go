@@ -156,10 +156,28 @@ func pinActionInWorkflow(pinnedWorkflow string, action string) {
 		writePinnedActionUpdate(pinnedWorkflow, action, updated)
 		return
 	}
+	// A ref pointing at an immutable release tag is already pinned, whatever its format (1, 1.2.3, v1.2.3)
+	if repoWithOwner, ref, err := pkg.SplitActionString(action, "@"); err == nil && IsReleaseImmutable(repoWithOwner, ref) {
+		if !pinLatest {
+			logger.Info("Action is pinned to an immutable release", logger.Args("action:", action))
+			return
+		}
+		sha, tag, err := resolveLatest(repoWithOwner)
+		if err != nil {
+			logger.Warn("Could not resolve latest release; leaving as-is", logger.Args("action:", action, "error:", err))
+			return
+		}
+		updated := BuildPinnedRef(repoWithOwner, sha, tag, IsReleaseImmutable(repoWithOwner, tag))
+		if updated != action {
+			writeModifiedWorkflowToFile(pinnedWorkflow, action, updated)
+		}
+		return
+	}
 	// Action doesn't have a hash
 	actionWithSha, err := processAction(action)
-	if err != nil {
-		logger.Warn("Nothing will be updated")
+	if err != nil || actionWithSha == "" {
+		logger.Warn("Nothing will be updated", logger.Args("action:", action))
+		return
 	}
 	writeModifiedWorkflowToFile(pinnedWorkflow, action, actionWithSha)
 }
@@ -172,12 +190,41 @@ func writeModifiedWorkflowToFile(fileName string, action string, actionWithSha s
 	if err != nil {
 		logger.Warn("Error reading file", logger.Args("file:", fileName, "error:", err))
 	}
-	modifiedContent := strings.Replace(string(newFileContent), action, actionWithSha, 1)
+	modifiedContent := replaceFullUses(string(newFileContent), action, actionWithSha)
 	err = os.WriteFile(fileName, []byte(modifiedContent), 0600)
 	if err != nil {
 		logger.Warn("Error creating file", logger.Args("file:", fileName, "error:", err))
 	}
-	logger.Info("Replacing action with sha", logger.Args("action:", action, "sha:", actionWithSha))
+	logger.Info("Replacing action with pinned reference", logger.Args("action:", action, "reference:", actionWithSha))
+}
+
+// replaceFullUses replaces the first occurrence of action that is a complete ref, not merely a prefix
+// of a longer one (e.g. "o/r@v1" must not match inside an already-updated "o/r@v1.2.3").
+func replaceFullUses(content, action, replacement string) string {
+	for start := 0; start < len(content); {
+		idx := strings.Index(content[start:], action)
+		if idx < 0 {
+			break
+		}
+		idx += start
+		end := idx + len(action)
+		if isRefBoundary(content, idx-1) && isRefBoundary(content, end) {
+			return content[:idx] + replacement + content[end:]
+		}
+		start = idx + 1
+	}
+	return content
+}
+
+// isRefBoundary reports whether position i is outside content or holds a non-ref character.
+func isRefBoundary(content string, i int) bool {
+	if i < 0 || i >= len(content) {
+		return true
+	}
+	b := content[i]
+	isRefChar := b == '.' || b == '-' || b == '_' || b == '/' || b == '@' ||
+		(b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+	return !isRefChar
 }
 
 func createTempYAMLFile(fileName string) (string, error) {
@@ -216,8 +263,7 @@ func processActionWithVersion(actionWithVersion string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s@%s #%s", repoWithOwner, strings.TrimSpace(commitSha), strings.TrimSpace(tagVersion)), nil
-
+	return BuildPinnedRef(repoWithOwner, commitSha, tagVersion, IsReleaseImmutable(repoWithOwner, tagVersion)), nil
 }
 
 func processActionWithBranch(actionWithBranch string) (string, error) {
@@ -298,8 +344,11 @@ func processPinnedActionToLatest(action string) (string, bool, error) {
 	}
 	resolvedSha := strings.TrimSpace(sha)
 	oldSha := strings.TrimPrefix(action, repoWithOwner+"@")
+	if IsReleaseImmutable(repoWithOwner, tag) {
+		return BuildPinnedRef(repoWithOwner, resolvedSha, tag, true), true, nil
+	}
 	changed := resolvedSha != oldSha
-	return fmt.Sprintf("%s@%s #%s", repoWithOwner, resolvedSha, strings.TrimSpace(tag)), changed, nil
+	return BuildPinnedRef(repoWithOwner, resolvedSha, tag, false), changed, nil
 }
 
 // writePinnedActionUpdate rewrites the first occurrence of a SHA-pinned ref (and its trailing
